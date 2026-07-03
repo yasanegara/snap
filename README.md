@@ -84,6 +84,26 @@ data/
 
 Ini cukup buat awal (puluhan-ratusan tim). Kalau nanti user udah ratusan/ribuan dan mulai berat, tinggal pindahin ke PostgreSQL — strukturnya sudah rapi jadi gampang dimigrasi nanti.
 
+## Fitur Publish (jadi website beneran)
+
+Setelah project di-Run dan tampilannya udah pas, klik tombol **🚀 Publish** di preview:
+1. Isi **slug** — ini jadi alamatnya, misal `exist-detailing` jadi `https://domainkamu.com/p/exist-detailing`
+2. (Opsional) isi **custom domain** kalau punya domain sendiri buat project itu
+
+### Biar custom domain aktif
+
+1. Beli/punya domain (misal `existdetailing.com`)
+2. Di pengaturan DNS domain itu, tambahkan record:
+   - Tipe **A** mengarah ke IP VPS kamu, ATAU
+   - Tipe **CNAME** mengarah ke domain utama tempat aplikasi ini jalan
+3. Kalau mau HTTPS otomatis buat domain-domain custom ini, sebaiknya taruh **Caddy** di depan aplikasi ini (bukan Nginx biasa) — Caddy bisa otomatis bikinin sertifikat HTTPS buat domain apa aja yang diarahkan ke dia, tanpa setting manual. Nanti tinggal bilang kalau mau saya bantu buatin config Caddy-nya.
+
+### Catatan soal publish
+
+- Kode React yang dipublish itu **cuma tampilan (snapshot)** dari data terakhir pas kamu klik Publish. Kalau nanti kamu ubah data lagi lewat panel admin di preview, halaman yang sudah dipublish **gak otomatis ikut berubah** — perlu klik Publish ulang.
+- 1 slug cuma bisa dipakai 1 tim. Kalau slug udah dipakai tim lain, akan ditolak otomatis.
+- Halaman yang sudah dipublish bisa dibuka siapa aja tanpa perlu login (memang tujuannya buat publik).
+
 ## Batasan paket Gratis
 
 Sekarang cuma dibatasi **jumlah project tersimpan (maksimal 3)**. Kalau mau nambah batasan lain (misal fitur tertentu dikunci), bilang aja, saya tambahin.

@@ -26,6 +26,22 @@ function isOrgPro(org) {
 }
 
 // ---------------------------------------------------------------------------
+// Custom domain: kalau ada yang buka lewat domain sendiri, langsung sajikan
+// halaman yang sudah dipublish buat domain itu (jalan sebelum semua route lain)
+// ---------------------------------------------------------------------------
+app.use((req, res, next) => {
+  const host = (req.headers.host || '').split(':')[0].toLowerCase();
+  if (!host || req.path.startsWith('/api/')) return next();
+  const publishes = readJSON('publishes');
+  const found = Object.values(publishes).find((p) => p.customDomain && p.customDomain.toLowerCase() === host);
+  if (found) {
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    return res.send(found.html);
+  }
+  next();
+});
+
+// ---------------------------------------------------------------------------
 // Halaman (gate login)
 // ---------------------------------------------------------------------------
 app.get('/', attachUserIfAny, (req, res) => {
@@ -34,6 +50,17 @@ app.get('/', attachUserIfAny, (req, res) => {
 
 app.get('/app', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Halaman publik hasil publish
+app.get('/p/:slug', (req, res) => {
+  const publishes = readJSON('publishes');
+  const item = publishes[req.params.slug];
+  if (!item) {
+    return res.status(404).send('<h1 style="font-family:sans-serif">404 - Halaman tidak ditemukan</h1>');
+  }
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.send(item.html);
 });
 
 // ---------------------------------------------------------------------------
@@ -167,6 +194,65 @@ app.delete('/api/data/:projectId', requireAuth, async (req, res) => {
   const store = readJSON('store');
   if (store[req.user.orgId]) delete store[req.user.orgId][req.params.projectId];
   await writeJSON('store', store);
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Publish — jadikan project sebagai halaman publik (punya slug / custom domain)
+// ---------------------------------------------------------------------------
+const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+app.get('/api/publish', requireAuth, (req, res) => {
+  const all = readJSON('publishes');
+  const list = Object.values(all)
+    .filter((p) => p.orgId === req.user.orgId)
+    .map((p) => ({ slug: p.slug, customDomain: p.customDomain, type: p.type, updatedAt: p.updatedAt }))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  res.json(list);
+});
+
+app.post('/api/publish', requireAuth, async (req, res) => {
+  const { slug, customDomain, html, type } = req.body || {};
+  if (!slug || !SLUG_PATTERN.test(slug)) {
+    return res.status(400).json({ error: 'Slug gak valid. Pakai huruf kecil, angka, dan tanda "-" aja, misal: exist-detailing' });
+  }
+  if (!html) return res.status(400).json({ error: 'Gak ada konten buat dipublish' });
+
+  const all = readJSON('publishes');
+  const existing = all[slug];
+  if (existing && existing.orgId !== req.user.orgId) {
+    return res.status(409).json({ error: 'Slug "' + slug + '" sudah dipakai tim lain. Coba slug lain.' });
+  }
+
+  if (customDomain) {
+    const domainTaken = Object.values(all).find(
+      (p) => p.customDomain && p.customDomain.toLowerCase() === customDomain.toLowerCase() && p.slug !== slug
+    );
+    if (domainTaken) {
+      return res.status(409).json({ error: 'Domain "' + customDomain + '" sudah dipakai project lain.' });
+    }
+  }
+
+  all[slug] = {
+    slug,
+    orgId: req.user.orgId,
+    customDomain: customDomain || null,
+    html,
+    type: type || 'react',
+    createdAt: existing ? existing.createdAt : Date.now(),
+    updatedAt: Date.now()
+  };
+  await writeJSON('publishes', all);
+
+  res.json({ ok: true, slug, url: '/p/' + slug });
+});
+
+app.delete('/api/publish/:slug', requireAuth, async (req, res) => {
+  const all = readJSON('publishes');
+  const item = all[req.params.slug];
+  if (!item || item.orgId !== req.user.orgId) return res.status(404).json({ error: 'tidak ditemukan' });
+  delete all[req.params.slug];
+  await writeJSON('publishes', all);
   res.json({ ok: true });
 });
 

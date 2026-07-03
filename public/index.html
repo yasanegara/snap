@@ -230,6 +230,7 @@
         <div class="spacer"></div>
         <button class="btn" id="openTabBtn">Buka di tab baru</button>
         <button class="btn" id="resetDataBtn" title="Hapus semua data hasil edit di preview (kembali ke data awal kode)">Reset data</button>
+        <button class="btn primary" id="publishBtn">🚀 Publish</button>
       </div>
       <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups"></iframe>
     </div>
@@ -243,6 +244,21 @@
     <div class="row">
       <button class="btn" id="cancelSaveBtn">Batal</button>
       <button class="btn primary" id="confirmSaveBtn">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="publishModal">
+  <div class="modal" style="width:380px;">
+    <h3>Publish project ini</h3>
+    <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px;">Slug (alamat)</label>
+    <input type="text" id="publishSlugInput" placeholder="misal: exist-detailing" />
+    <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px;">Custom domain (opsional)</label>
+    <input type="text" id="publishDomainInput" placeholder="misal: existdetailing.com (kosongkan kalau gak punya)" />
+    <div id="publishResult" style="display:none;background:#0f2e29;border:1px solid #1a4a40;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:14px;color:#a7f3e8;word-break:break-all;"></div>
+    <div class="row">
+      <button class="btn" id="cancelPublishBtn">Tutup</button>
+      <button class="btn primary" id="confirmPublishBtn">Publish</button>
     </div>
   </div>
 </div>
@@ -310,6 +326,7 @@ window.__firebaseShim = (function(){
   var __listeners = [];
   var __syncTimer = null;
   function __sync(){
+    if (window.__publishedStatic) return;
     clearTimeout(__syncTimer);
     __syncTimer = setTimeout(function(){
       try {
@@ -503,7 +520,8 @@ function stripExports(code){
 }
 
 // ---------- Build & run preview ----------
-function buildReactDoc(code){
+function buildReactDoc(code, options){
+  options = options || {};
   let componentName = extractDefaultComponentName(code) || 'App';
   let processed = rewriteImports(code);
   processed = stripExports(processed);
@@ -533,6 +551,32 @@ function buildReactDoc(code){
   const combined = RUNNER_SHIMS_SRC + '\n' + transformed + '\n' + mountCode;
   const combinedEscaped = JSON.stringify(combined);
 
+  const bootScript = options.publishMode
+    ? `
+  window.__publishedStatic = true;
+  window.__initialFirestoreStore = ${JSON.stringify(options.bakedData || {})};
+  (function(){
+    var s = document.createElement('script');
+    s.textContent = ${combinedEscaped};
+    document.body.appendChild(s);
+  })();`
+    : `
+  // Ambil data yang sudah tersimpan di server DULU, baru jalankan komponennya.
+  // Ini penting biar data lama tidak ketiban/ketimpa data bawaan kode tiap kali dibuka.
+  (function(){
+    fetch('/api/data/' + encodeURIComponent(window.__projectId))
+      .then(function(r){ return r.ok ? r.json() : {}; })
+      .catch(function(){ return {}; })
+      .then(function(store){
+        window.__initialFirestoreStore = store || {};
+        var badge = document.getElementById('loading-badge');
+        if (badge) badge.remove();
+        var s = document.createElement('script');
+        s.textContent = ${combinedEscaped};
+        document.body.appendChild(s);
+      });
+  })();`;
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -556,7 +600,7 @@ function buildReactDoc(code){
 <body>
 <div id="root"></div>
 <div id="error-overlay"></div>
-<div id="loading-badge">Memuat data...</div>
+${options.publishMode ? '' : '<div id="loading-badge">Memuat data...</div>'}
 <script>
   window.__app_id = 'preview-app';
   window.__firebase_config = '{}';
@@ -572,22 +616,7 @@ function buildReactDoc(code){
     el.style.display = 'block';
     el.textContent = 'Unhandled error:\n' + (e.reason && e.reason.stack ? e.reason.stack : e.reason);
   });
-
-  // Ambil data yang sudah tersimpan di server DULU, baru jalankan komponennya.
-  // Ini penting biar data lama tidak ketiban/ketimpa data bawaan kode tiap kali dibuka.
-  (function(){
-    fetch('/api/data/' + encodeURIComponent(window.__projectId))
-      .then(function(r){ return r.ok ? r.json() : {}; })
-      .catch(function(){ return {}; })
-      .then(function(store){
-        window.__initialFirestoreStore = store || {};
-        var badge = document.getElementById('loading-badge');
-        if (badge) badge.remove();
-        var s = document.createElement('script');
-        s.textContent = ${combinedEscaped};
-        document.body.appendChild(s);
-      });
-  })();
+${bootScript}
 <\/script>
 </body>
 </html>`;
@@ -663,6 +692,71 @@ codeInput.addEventListener('input', () => {
   clearTimeout(autorunTimer);
   autorunTimer = setTimeout(runPreview, 900);
 });
+
+// ---------- Publish (jadi website beneran, punya alamat sendiri) ----------
+function slugify(s){
+  return String(s).toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+document.getElementById('publishBtn').onclick = () => {
+  if (!codeInput.value.trim()) { return; }
+  document.getElementById('publishSlugInput').value = '';
+  document.getElementById('publishDomainInput').value = '';
+  document.getElementById('publishResult').style.display = 'none';
+  document.getElementById('publishModal').classList.add('show');
+};
+document.getElementById('cancelPublishBtn').onclick = () => {
+  document.getElementById('publishModal').classList.remove('show');
+};
+
+document.getElementById('confirmPublishBtn').onclick = async () => {
+  const rawSlug = document.getElementById('publishSlugInput').value.trim();
+  const domain = document.getElementById('publishDomainInput').value.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const resultBox = document.getElementById('publishResult');
+  const slug = slugify(rawSlug);
+
+  if (!slug) {
+    alert('Isi slug dulu ya, misal: exist-detailing');
+    return;
+  }
+
+  const code = codeInput.value;
+  let html;
+
+  try {
+    if (currentType === 'react') {
+      const projectId = hashCode(code.trim());
+      let bakedData = {};
+      try {
+        const res = await fetch('/api/data/' + encodeURIComponent(projectId));
+        if (res.ok) bakedData = await res.json();
+      } catch (e) { /* gapapa, publish dengan data kosong */ }
+      html = buildReactDoc(code, { publishMode: true, bakedData });
+    } else {
+      html = buildHtmlDoc(code);
+    }
+
+    const res = await fetch('/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, customDomain: domain || null, html, type: currentType })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Gagal publish.');
+      return;
+    }
+    const fullUrl = window.location.origin + data.url;
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = 'Berhasil dipublish!<br><br>Link: <a href="' + fullUrl + '" target="_blank" style="color:#5eead4;">' + fullUrl + '</a>' +
+      (domain ? '<br><br>Custom domain: arahkan DNS domain <b>' + domain + '</b> (record CNAME/A) ke server ini biar aktif.' : '');
+  } catch (e) {
+    alert('Gagal publish: ' + e.message);
+  }
+};
 
 // ---------- Riwayat (disimpan di server, dibagi ke semua orang di tim) ----------
 const historyList = document.getElementById('historyList');
