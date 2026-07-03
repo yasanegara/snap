@@ -1,0 +1,17 @@
+{
+  "name": "live-preview-saas",
+  "version": "1.0.0",
+  "description": "Live Preview Studio - versi SaaS (multi-tenant + billing Midtrans)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cookie-parser": "^1.4.6",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "midtrans-client": "^1.3.1",
+    "dotenv": "^16.4.5"
+  }
+}
