@@ -128,11 +128,21 @@
     <div class="field">
       <label>Fitur Tambahan</label>
       <div class="chip-group" id="featureChips">
-        <div class="chip active" data-val="Tombol kontak WhatsApp mengambang">Tombol WhatsApp</div>
+        <div class="chip active" id="waChip" data-val="Tombol kontak WhatsApp mengambang">Tombol WhatsApp</div>
         <div class="chip active" data-val="Upload foto lewat panel admin di beberapa bagian (hero, galeri, dll)">Upload Foto Admin</div>
         <div class="chip" data-val="Peta lokasi (gambar peta statis atau placeholder)">Peta Lokasi</div>
         <div class="chip" data-val="Form kontak/konsultasi sederhana">Form Kontak</div>
         <div class="chip" data-val="Animasi scroll ringan (fade-in saat elemen muncul)">Animasi Scroll</div>
+      </div>
+      <div id="waFields" style="margin-top:14px;padding:14px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;">
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11.5px;color:#c7ccd4;display:block;margin-bottom:6px;">Nomor WhatsApp (pakai kode negara, contoh: 6281234567890)</label>
+          <input type="text" id="waNumber" placeholder="6281234567890" />
+        </div>
+        <div>
+          <label style="font-size:11.5px;color:#c7ccd4;display:block;margin-bottom:6px;">Pesan Default (yang otomatis terisi saat tombol diklik)</label>
+          <input type="text" id="waMessage" placeholder="Halo, saya ingin bertanya tentang layanan Anda" />
+        </div>
       </div>
     </div>
 
@@ -208,6 +218,15 @@ document.querySelectorAll('.swatch').forEach(sw => {
   });
 });
 
+// Tampilkan/sembunyikan kotak isian nomor & pesan WhatsApp sesuai chip aktif/enggak
+const waChip = document.getElementById('waChip');
+const waFields = document.getElementById('waFields');
+function syncWaFields(){
+  waFields.style.display = waChip.classList.contains('active') ? 'block' : 'none';
+}
+waChip.addEventListener('click', syncWaFields);
+syncWaFields();
+
 function getActiveVals(containerId) {
   return Array.from(document.querySelectorAll('#' + containerId + ' .active')).map(el => el.dataset.val);
 }
@@ -219,7 +238,14 @@ document.getElementById('generateBtn').addEventListener('click', () => {
   const style = document.getElementById('styleSelect').value;
   const activeColor = document.querySelector('#colorSwatches .active');
   const color = activeColor ? activeColor.dataset.val : 'gold/amber (#D97706)';
-  const features = getActiveVals('featureChips');
+  const features = getActiveVals('featureChips').map(f => {
+    if (f === 'Tombol kontak WhatsApp mengambang') {
+      const num = document.getElementById('waNumber').value.trim() || '(isi nomor WhatsApp)';
+      const msg = document.getElementById('waMessage').value.trim() || 'Halo, saya ingin bertanya tentang layanan Anda';
+      return 'Tombol kontak WhatsApp mengambang, mengarah ke nomor ' + num + ' dengan pesan default: "' + msg + '"';
+    }
+    return f;
+  });
   const lang = document.getElementById('langSelect').value;
 
   const contractHooks = document.getElementById('contractHooks').textContent.trim();
