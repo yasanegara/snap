@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prompt Generator — Live Preview Studio</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151a; --panel-2:#171b21; --line:#232830;
+    --text:#e6e9ee; --muted:#8b93a1; --accent:#5eead4; --accent-dim:#0f2e29;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    min-height:100vh;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 18px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  header h1{ font-size:14px; margin:0; font-weight:600; }
+  header a{ color:var(--accent); text-decoration:none; font-size:12.5px; }
+  .layout{ display:flex; max-width:1400px; margin:0 auto; min-height:calc(100vh - 53px); }
+  .form-pane, .result-pane{ flex:1; padding:28px; }
+  .form-pane{ border-right:1px solid var(--line); }
+  h2{ font-size:16px; margin:0 0 4px; }
+  p.sub{ color:var(--muted); font-size:12.5px; margin:0 0 24px; }
+  .field{ margin-bottom:20px; }
+  .field label{ display:block; font-size:12.5px; font-weight:600; color:#c7ccd4; margin-bottom:8px; }
+  .field .hint{ font-size:11.5px; color:var(--muted); margin-top:5px; }
+  input[type=text], textarea, select{
+    width:100%; background:#0d0f12; border:1px solid var(--line); color:var(--text);
+    padding:10px 12px; border-radius:8px; font-size:13px; outline:none; font-family:inherit;
+  }
+  input[type=text]:focus, textarea:focus, select:focus{ border-color:var(--accent); }
+  textarea{ resize:vertical; min-height:70px; }
+  .chip-group{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    border:1px solid var(--line); background:var(--panel-2); color:#c7ccd4;
+    padding:7px 13px; border-radius:20px; font-size:12.5px; cursor:pointer; user-select:none;
+  }
+  .chip.active{ background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
+  .swatches{ display:flex; gap:10px; flex-wrap:wrap; }
+  .swatch{
+    width:34px; height:34px; border-radius:50%; cursor:pointer; border:2px solid transparent;
+  }
+  .swatch.active{ border-color:#fff; transform:scale(1.1); }
+  .btn{
+    border:1px solid var(--line); background:var(--panel-2); color:var(--text);
+    padding:10px 18px; border-radius:8px; font-size:13px; cursor:pointer; font-weight:600;
+  }
+  .btn.primary{ background:var(--accent); color:#04211d; border-color:var(--accent); width:100%; padding:13px; font-size:13.5px; }
+  .btn.primary:hover{ filter:brightness(1.05); }
+  .btn.small{ padding:6px 12px; font-size:12px; }
+  #promptOutput{
+    width:100%; min-height:520px; background:#0d0f12; border:1px solid var(--line); color:#dbe2ea;
+    padding:16px; border-radius:10px; font-family:ui-monospace,monospace; font-size:12.3px; line-height:1.6;
+    white-space:pre-wrap;
+  }
+  .result-toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .result-toolbar span{ font-size:12px; color:var(--muted); }
+  .empty-state{ color:var(--muted); font-size:13px; text-align:center; padding:60px 20px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧠 Prompt Generator — Live Preview Studio</h1>
+  <a href="/app">← Kembali ke tool</a>
+</header>
+
+<div class="layout">
+  <div class="form-pane">
+    <h2>Isi Detail Website</h2>
+    <p class="sub">Isi ini, nanti otomatis jadi prompt siap-paste ke Gemini/Claude. Hasil kodenya dijamin langsung nyambung ke fitur simpan-data platform ini.</p>
+
+    <div class="field">
+      <label>Nama Bisnis / Website</label>
+      <input type="text" id="bizName" placeholder="misal: Exist Auto Detailing" />
+    </div>
+
+    <div class="field">
+      <label>Jenis Bisnis & Target Pasar</label>
+      <textarea id="bizDesc" placeholder="misal: Jasa detailing mobil premium di Sleman, target pasarnya pemilik mobil menengah-atas yang peduli perawatan kendaraan"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Section yang Mau Ada</label>
+      <div class="chip-group" id="sectionChips">
+        <div class="chip active" data-val="Hero (banner utama)">Hero</div>
+        <div class="chip active" data-val="Tentang Kami">Tentang</div>
+        <div class="chip active" data-val="Layanan/Produk">Layanan/Produk</div>
+        <div class="chip" data-val="Keunggulan/Kenapa Pilih Kami">Keunggulan</div>
+        <div class="chip active" data-val="Testimoni Pelanggan">Testimoni</div>
+        <div class="chip" data-val="Galeri Foto">Galeri</div>
+        <div class="chip" data-val="Daftar Harga/Paket">Harga/Paket</div>
+        <div class="chip" data-val="FAQ">FAQ</div>
+        <div class="chip active" data-val="Kontak & Lokasi">Kontak</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Gaya Visual</label>
+      <select id="styleSelect">
+        <option value="Modern minimalis, banyak whitespace, tipografi bersih">Modern Minimalis</option>
+        <option value="Premium/mewah, tema gelap dengan aksen warna metalik (gold/silver)">Premium / Mewah (Dark + Gold)</option>
+        <option value="Ceria dan playful, warna-warni, ilustrasi kartun">Ceria & Playful</option>
+        <option value="Korporat profesional, warna biru/navy, tegas dan formal">Korporat Profesional</option>
+        <option value="Elegan feminin, warna pastel, font berlekuk">Elegan Feminin</option>
+        <option value="Rustic/tradisional hangat, warna earth-tone, sentuhan kayu">Rustic / Tradisional Hangat</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Warna Aksen Utama</label>
+      <div class="swatches" id="colorSwatches">
+        <div class="swatch active" style="background:#D97706" data-val="gold/amber (#D97706)"></div>
+        <div class="swatch" style="background:#2563EB" data-val="biru (#2563EB)"></div>
+        <div class="swatch" style="background:#DC2626" data-val="merah (#DC2626)"></div>
+        <div class="swatch" style="background:#059669" data-val="hijau emerald (#059669)"></div>
+        <div class="swatch" style="background:#DB2777" data-val="pink (#DB2777)"></div>
+        <div class="swatch" style="background:#7C3AED" data-val="ungu (#7C3AED)"></div>
+        <div class="swatch" style="background:#111827;border:1px solid #333" data-val="hitam/monokrom (#111827)"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Fitur Tambahan</label>
+      <div class="chip-group" id="featureChips">
+        <div class="chip active" data-val="Tombol kontak WhatsApp mengambang">Tombol WhatsApp</div>
+        <div class="chip active" data-val="Upload foto lewat panel admin di beberapa bagian (hero, galeri, dll)">Upload Foto Admin</div>
+        <div class="chip" data-val="Peta lokasi (gambar peta statis atau placeholder)">Peta Lokasi</div>
+        <div class="chip" data-val="Form kontak/konsultasi sederhana">Form Kontak</div>
+        <div class="chip" data-val="Animasi scroll ringan (fade-in saat elemen muncul)">Animasi Scroll</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Bahasa Konten</label>
+      <select id="langSelect">
+        <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+        <option value="English">English</option>
+      </select>
+    </div>
+
+    <button class="btn primary" id="generateBtn">✨ Generate Prompt</button>
+  </div>
+
+  <div class="result-pane">
+    <div class="result-toolbar">
+      <span id="resultStatus">Hasil prompt akan muncul di sini</span>
+      <button class="btn small" id="copyBtn" style="display:none;">📋 Copy Prompt</button>
+    </div>
+    <div id="promptOutput"><div class="empty-state">Isi form di kiri, lalu klik "Generate Prompt".</div></div>
+  </div>
+</div>
+
+<!-- Kontrak teknis (dipasang mentah, gak diparse browser, tinggal dibaca lewat JS) -->
+<script type="text/plain" id="contractHooks">
+  const [siteData, setSiteData] = useState(defaultSiteData);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved', 'error'
+
+  // WAJIB: muat data yang sudah tersimpan sebelumnya saat halaman pertama dibuka
+  useEffect(() => {
+    if (!window.__dataEndpoint) { setDataLoaded(true); return; }
+    fetch(window.__dataEndpoint)
+      .then(r => r.ok ? r.json() : null)
+      .then(saved => { if (saved && saved.sections) setSiteData(saved); setDataLoaded(true); })
+      .catch(() => setDataLoaded(true));
+  }, []);
+
+  // WAJIB: simpan otomatis tiap kali siteData berubah (debounce 500ms)
+  useEffect(() => {
+    if (!dataLoaded || !window.__dataEndpoint) return;
+    setSaveStatus('saving');
+    const timer = setTimeout(() => {
+      fetch(window.__dataEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(siteData)
+      }).then(r => setSaveStatus(r.ok ? 'saved' : 'error')).catch(() => setSaveStatus('error'));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [siteData, dataLoaded]);
+</script>
+
+<script type="text/plain" id="contractUploader">
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => onImageChange(reader.result); // WAJIB base64, JANGAN URL.createObjectURL
+      reader.readAsDataURL(file);
+    }
+  };
+</script>
+
+<script>
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => chip.classList.toggle('active'));
+});
+document.querySelectorAll('.swatch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    sw.classList.add('active');
+  });
+});
+
+function getActiveVals(containerId) {
+  return Array.from(document.querySelectorAll('#' + containerId + ' .active')).map(el => el.dataset.val);
+}
+
+document.getElementById('generateBtn').addEventListener('click', () => {
+  const bizName = document.getElementById('bizName').value.trim() || '(isi nama bisnis)';
+  const bizDesc = document.getElementById('bizDesc').value.trim() || '(isi deskripsi bisnis)';
+  const sections = getActiveVals('sectionChips');
+  const style = document.getElementById('styleSelect').value;
+  const activeColor = document.querySelector('#colorSwatches .active');
+  const color = activeColor ? activeColor.dataset.val : 'gold/amber (#D97706)';
+  const features = getActiveVals('featureChips');
+  const lang = document.getElementById('langSelect').value;
+
+  const contractHooks = document.getElementById('contractHooks').textContent.trim();
+  const contractUploader = document.getElementById('contractUploader').textContent.trim();
+
+  const sectionList = sections.length ? sections.map(s => '- ' + s).join('\n') : '- (bebas, tentukan sendiri section yang relevan)';
+  const featureList = features.length ? features.map(f => '- ' + f).join('\n') : '- (tidak ada fitur tambahan khusus)';
+
+  const prompt = 'Buatkan saya SATU FILE HTML lengkap (bukan React project terpisah) untuk website bisnis berikut:\n\n' +
+'NAMA BISNIS: ' + bizName + '\n' +
+'DESKRIPSI & TARGET PASAR: ' + bizDesc + '\n' +
+'BAHASA KONTEN: ' + lang + '\n\n' +
+'SECTION YANG HARUS ADA:\n' + sectionList + '\n\n' +
+'GAYA VISUAL: ' + style + '\n' +
+'WARNA AKSEN UTAMA: ' + color + '\n\n' +
+'FITUR TAMBAHAN:\n' + featureList + '\n\n' +
+'=====================================================\n' +
+'ATURAN TEKNIS WAJIB (JANGAN DIUBAH, INI KONTRAK PLATFORM):\n' +
+'=====================================================\n\n' +
+'1. STRUKTUR FILE\n' +
+'Buat sebagai SATU file HTML utuh (<!DOCTYPE html> sampai </html>), dengan:\n' +
+'- Tailwind CSS lewat <script src="https://cdn.tailwindcss.com"></script>\n' +
+'- React 18 + ReactDOM lewat <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script> dan react-dom versi UMD yang sama\n' +
+'- Babel Standalone lewat <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>\n' +
+'- Semua komponen React ditulis di dalam SATU <script type="text/babel"> di akhir <body>\n' +
+'- JANGAN pakai import/export, JANGAN pakai file terpisah, JANGAN pakai Firebase\n\n' +
+'2. MODEL DATA\n' +
+'Semua konten yang bisa diedit (judul, teks, foto, dll) HARUS disimpan dalam SATU object bernama `defaultSiteData`, dengan struktur:\n' +
+'{\n' +
+'  design: { ctaColor: "...", ctaHoverColor: "...", ctaTextColor: "..." },\n' +
+'  sectionOrder: ["hero", "about", ...],\n' +
+'  sections: { hero: { visible: true, title: "...", image: "...", ... }, about: {...}, ... }\n' +
+'}\n' +
+'Setiap section punya field `visible` (boolean) buat sembunyikan/tampilkan.\n\n' +
+'3. KOMPONEN App HARUS PAKAI STATE INI (SALIN PERSIS, JANGAN DIUBAH LOGIKANYA):\n\n' +
+'```jsx\n' + contractHooks + '\n```\n\n' +
+'Taruh kode di atas di paling awal komponen `App`, sebelum logic lainnya. Tampilkan juga indikator kecil di panel admin: tampilkan teks "Menyimpan..." kalau saveStatus === "saving", "Tersimpan ✓" kalau "saved", "Gagal menyimpan" kalau "error".\n\n' +
+'4. UPLOAD FOTO HARUS PAKAI POLA INI (SALIN PERSIS):\n\n' +
+'```jsx\n' + contractUploader + '\n```\n\n' +
+'JANGAN PERNAH pakai `URL.createObjectURL(file)` untuk foto yang mau disimpan permanen — itu cuma sementara dan akan hilang saat refresh.\n\n' +
+'5. HALAMAN ADMIN\n' +
+'Buat panel admin (bisa diakses lewat tombol kecil/ikon gear yang gak terlalu mencolok di navbar) yang bisa mengedit semua field di `siteData` sesuai section yang ada. Untuk saat ini, pakai login sederhana dulu (username: admin, password: admin123) — ini akan di-upgrade ke sistem login asli oleh platform nanti, jadi jangan bikin logic login yang rumit.\n\n' +
+'6. RESPONSIVE\n' +
+'Pastikan tampilan rapi di HP (mobile-first) dan desktop.\n\n' +
+'Tolong langsung berikan kode HTML lengkapnya, tanpa penjelasan panjang di luar kode.';
+
+  document.getElementById('promptOutput').textContent = prompt;
+  document.getElementById('resultStatus').textContent = prompt.length + ' karakter — siap di-copy';
+  document.getElementById('copyBtn').style.display = 'inline-block';
+});
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const text = document.getElementById('promptOutput').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    const original = btn.textContent;
+    btn.textContent = '✓ Ke-copy!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>

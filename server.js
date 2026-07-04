@@ -75,6 +75,10 @@ app.get('/app', requireAuthPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+app.get('/prompt-generator.html', requireAuthPage, (req, res) => {
+  res.sendFile(path.join(__dirname, 'private-pages', 'prompt-generator.html'));
+});
+
 // Halaman publik hasil publish
 app.get('/p/:slug', async (req, res) => {
   const r = await pool.query('SELECT html FROM publishes WHERE slug = $1', [req.params.slug]);

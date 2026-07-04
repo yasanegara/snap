@@ -195,6 +195,7 @@
   <div style="display:flex;align-items:center;gap:10px;">
     <span id="planBadge" style="font-size:11px;background:var(--panel-2);color:var(--muted);padding:4px 9px;border-radius:6px;"></span>
     <span id="orgLabel" style="font-size:12.5px;color:var(--muted);"></span>
+    <a href="/prompt-generator.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">🧠 Prompt Generator</a>
     <a href="/billing.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">Upgrade</a>
     <button id="logoutBtn" class="btn" style="padding:5px 10px;">Keluar</button>
   </div>
@@ -635,14 +636,23 @@ ${bootScript}
 }
 
 
-function buildHtmlDoc(code){
+function buildHtmlDoc(code, options){
+  options = options || {};
+  const dataEndpointBase = options.dataEndpointBase || '/api/data/';
+  const dataKey = options.dataKey || hashCode(code.trim());
+  const bridgeTag = `<script>
+    window.__projectId = ${JSON.stringify(dataKey)};
+    window.__dataEndpointBase = ${JSON.stringify(dataEndpointBase)};
+    window.__dataEndpoint = window.__dataEndpointBase + encodeURIComponent(window.__projectId);
+  <\/script>`;
+
   const hasTailwind = /tailwindcss/i.test(code) || /cdn\.tailwindcss/i.test(code);
   const tailwindTag = hasTailwind ? '' : '<script src="https://cdn.tailwindcss.com"><\/script>';
   const looksFullDoc = /<html[\s>]/i.test(code);
   if (looksFullDoc) {
-    return code.replace(/<head>/i, '<head>' + tailwindTag);
+    return code.replace(/<head[^>]*>/i, (m) => m + bridgeTag + tailwindTag);
   }
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8" />${tailwindTag}</head><body>${code}</body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8" />${bridgeTag}${tailwindTag}</head><body>${code}</body></html>`;
 }
 
 function errorDoc(message){
@@ -659,7 +669,9 @@ function runPreview(){
   statusBar.classList.remove('error');
   statusBar.textContent = 'Menjalankan preview...';
 
-  const doc = currentType === 'react' ? buildReactDoc(code) : buildHtmlDoc(code);
+  const doc = currentType === 'react'
+    ? buildReactDoc(code)
+    : buildHtmlDoc(code, { dataEndpointBase: '/api/data/', dataKey: hashCode(code.trim()) });
   previewFrame.srcdoc = doc;
 
   setTimeout(() => {
@@ -740,17 +752,18 @@ document.getElementById('confirmPublishBtn').onclick = async () => {
   let initialData = {};
 
   try {
+    // Ambil data preview terakhir, cuma buat bekal awal kalau ini publish PERTAMA kali.
+    // Kalau slug-nya udah pernah dipublish, data yang sudah hidup di sana gak akan ditimpa.
+    const projectId = hashCode(code.trim());
+    try {
+      const res = await fetch('/api/data/' + encodeURIComponent(projectId));
+      if (res.ok) initialData = await res.json();
+    } catch (e) { /* gapapa, mulai kosong */ }
+
     if (currentType === 'react') {
-      // Ambil data preview terakhir, cuma buat bekal awal kalau ini publish PERTAMA kali.
-      // Kalau slug-nya udah pernah dipublish, data yang sudah hidup di sana gak akan ditimpa.
-      const projectId = hashCode(code.trim());
-      try {
-        const res = await fetch('/api/data/' + encodeURIComponent(projectId));
-        if (res.ok) initialData = await res.json();
-      } catch (e) { /* gapapa, mulai kosong */ }
       html = buildReactDoc(code, { dataEndpointBase: '/api/public-data/', dataKey: slug });
     } else {
-      html = buildHtmlDoc(code);
+      html = buildHtmlDoc(code, { dataEndpointBase: '/api/public-data/', dataKey: slug });
     }
 
     const res = await fetch('/api/publish', {
