@@ -413,9 +413,28 @@ window.__firebaseShim = (function(){
     limit: function(){ return {}; },
     serverTimestamp: function(){ return Date.now(); },
     getStorage: function(){ return { __mock: true }; },
-    ref: function(){ return { __mock: true }; },
-    uploadBytes: function(){ return Promise.resolve({ __mock: true }); },
-    getDownloadURL: function(){ return Promise.resolve('https://placehold.co/600x400?text=Preview+Image'); }
+    ref: function(storage, path){ return { __mock: true, __path: path }; },
+    uploadBytes: function(storageRef, file){
+      return new Promise(function(resolve, reject){
+        try {
+          if (!file || typeof file.arrayBuffer !== 'function' && !(file instanceof Blob)) {
+            // bukan File/Blob asli, gak bisa dibaca -> tetep resolve biar kode gak crash
+            resolve({ ref: storageRef, metadata: {} });
+            return;
+          }
+          var reader = new FileReader();
+          reader.onload = function(){
+            storageRef.__dataUrl = reader.result; // simpan hasil upload sebagai teks base64 di ref-nya
+            resolve({ ref: storageRef, metadata: {} });
+          };
+          reader.onerror = function(){ reject(new Error('Gagal membaca file yang diupload')); };
+          reader.readAsDataURL(file);
+        } catch (e) { reject(e); }
+      });
+    },
+    getDownloadURL: function(storageRef){
+      return Promise.resolve(storageRef && storageRef.__dataUrl ? storageRef.__dataUrl : 'https://placehold.co/600x400?text=No+Image');
+    }
   };
 })();
 
@@ -774,6 +793,11 @@ document.getElementById('confirmSaveBtn').onclick = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, type: currentType, code: codeInput.value })
     });
+    if (res.status === 401) {
+      alert('Sesi login kamu sudah habis. Silakan login lagi.');
+      window.location.href = '/login.html';
+      return;
+    }
     if (res.status === 402) {
       const data = await res.json();
       saveModal.classList.remove('show');
@@ -782,11 +806,15 @@ document.getElementById('confirmSaveBtn').onclick = async () => {
       }
       return;
     }
-    if (!res.ok) throw new Error('Server menolak permintaan');
+    if (!res.ok) {
+      let detail = 'HTTP ' + res.status;
+      try { const data = await res.json(); if (data && data.error) detail = data.error; } catch (e2) { /* bukan JSON */ }
+      throw new Error(detail);
+    }
     saveModal.classList.remove('show');
     loadHistory();
   } catch (e) {
-    alert('Gagal menyimpan. Pastikan servernya sedang jalan. Detail: ' + e.message);
+    alert('Gagal menyimpan.\n\nDetail: ' + e.message);
   }
 };
 saveNameInput.addEventListener('keydown', (e) => {

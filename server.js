@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const cookieParser = require('cookie-parser');
 
 const { pool, migrate } = require('./lib/db');
-const { createSessionCookie, clearSessionCookie, requireAuth, attachUserIfAny } = require('./lib/auth');
+const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny } = require('./lib/auth');
 const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
 
 const app = express();
@@ -50,11 +50,28 @@ app.use(async (req, res, next) => {
 // ---------------------------------------------------------------------------
 // Halaman (gate login)
 // ---------------------------------------------------------------------------
+// Buka alamat ini lewat browser buat cek status koneksi database
+app.get('/api/health-check', async (req, res) => {
+  const info = {
+    databaseUrlAda: !!process.env.DATABASE_URL,
+    databaseUrlSekilas: process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/:[^:@]+@/, ':****@') : null
+  };
+  try {
+    await pool.query('SELECT 1');
+    info.koneksiDatabase = 'OK, berhasil konek';
+  } catch (e) {
+    info.koneksiDatabase = 'GAGAL';
+    info.errorMessage = e.message;
+    info.errorCode = e.code || null;
+  }
+  res.json(info);
+});
+
 app.get('/', attachUserIfAny, (req, res) => {
   res.redirect(req.user ? '/app' : '/login.html');
 });
 
-app.get('/app', requireAuth, (req, res) => {
+app.get('/app', requireAuthPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
