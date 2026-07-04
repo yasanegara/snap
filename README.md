@@ -72,17 +72,21 @@ pm2 startup
 
 Terus pasang Nginx reverse proxy (lihat contoh config di project sebelumnya) supaya bisa diakses pakai domain + HTTPS. **HTTPS wajib** buat Midtrans production (bukan sandbox).
 
-## Struktur data (masih pakai file JSON, belum Postgres)
+## Database: PostgreSQL
 
-```
-data/
-  users.json     -> daftar user + password (di-hash, aman)
-  orgs.json      -> daftar tim + status paket (gratis/pro)
-  snippets.json  -> kode yang disimpan, ditandai punya tim mana
-  store.json     -> data live preview, dikelompokkan per tim > per project
-```
+Aplikasi ini jalan di Railway. Cara nyalain database-nya:
 
-Ini cukup buat awal (puluhan-ratusan tim). Kalau nanti user udah ratusan/ribuan dan mulai berat, tinggal pindahin ke PostgreSQL — strukturnya sudah rapi jadi gampang dimigrasi nanti.
+1. Buka project kamu di Railway
+2. Klik **+ New** → **Database** → **PostgreSQL**
+3. Railway otomatis bikin database dan otomatis isi `DATABASE_URL` buat aplikasi ini — gak perlu setting manual apa pun
+4. Redeploy (biasanya Railway restart otomatis)
+
+Begitu aplikasi nyala, dia otomatis bikin semua tabel yang dibutuhin sendiri (users, orgs, snippets, project_data, publishes, public_data).
+
+Kalau mau tes di komputer sendiri dulu, isi `DATABASE_URL` di file `.env`:
+```
+DATABASE_URL=postgres://postgres:password@localhost:5432/live_preview
+```
 
 ## Fitur Publish (jadi website beneran)
 

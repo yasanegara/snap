@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const cookieParser = require('cookie-parser');
 
-const { readJSON, writeJSON } = require('./lib/jsonStore');
+const { pool, migrate } = require('./lib/db');
 const { createSessionCookie, clearSessionCookie, requireAuth, attachUserIfAny } = require('./lib/auth');
 const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
 
@@ -22,23 +22,29 @@ function genId(prefix) {
 }
 
 function isOrgPro(org) {
-  return org && org.plan === 'pro' && org.subscriptionExpiresAt && org.subscriptionExpiresAt > Date.now();
+  return org && org.plan === 'pro' && org.subscription_expires_at && Number(org.subscription_expires_at) > Date.now();
+}
+
+async function getOrg(orgId) {
+  const r = await pool.query('SELECT * FROM orgs WHERE id = $1', [orgId]);
+  return r.rows[0] || null;
 }
 
 // ---------------------------------------------------------------------------
 // Custom domain: kalau ada yang buka lewat domain sendiri, langsung sajikan
 // halaman yang sudah dipublish buat domain itu (jalan sebelum semua route lain)
 // ---------------------------------------------------------------------------
-app.use((req, res, next) => {
-  const host = (req.headers.host || '').split(':')[0].toLowerCase();
-  if (!host || req.path.startsWith('/api/')) return next();
-  const publishes = readJSON('publishes');
-  const found = Object.values(publishes).find((p) => p.customDomain && p.customDomain.toLowerCase() === host);
-  if (found) {
-    res.set('Content-Type', 'text/html; charset=utf-8');
-    return res.send(found.html);
-  }
-  next();
+app.use(async (req, res, next) => {
+  try {
+    const host = (req.headers.host || '').split(':')[0].toLowerCase();
+    if (!host || req.path.startsWith('/api/')) return next();
+    const r = await pool.query('SELECT html FROM publishes WHERE LOWER(custom_domain) = $1', [host]);
+    if (r.rows[0]) {
+      res.set('Content-Type', 'text/html; charset=utf-8');
+      return res.send(r.rows[0].html);
+    }
+    next();
+  } catch (e) { next(); }
 });
 
 // ---------------------------------------------------------------------------
@@ -53,14 +59,11 @@ app.get('/app', requireAuth, (req, res) => {
 });
 
 // Halaman publik hasil publish
-app.get('/p/:slug', (req, res) => {
-  const publishes = readJSON('publishes');
-  const item = publishes[req.params.slug];
-  if (!item) {
-    return res.status(404).send('<h1 style="font-family:sans-serif">404 - Halaman tidak ditemukan</h1>');
-  }
+app.get('/p/:slug', async (req, res) => {
+  const r = await pool.query('SELECT html FROM publishes WHERE slug = $1', [req.params.slug]);
+  if (!r.rows[0]) return res.status(404).send('<h1 style="font-family:sans-serif">404 - Halaman tidak ditemukan</h1>');
   res.set('Content-Type', 'text/html; charset=utf-8');
-  res.send(item.html);
+  res.send(r.rows[0].html);
 });
 
 // ---------------------------------------------------------------------------
@@ -71,25 +74,21 @@ app.post('/api/auth/register', async (req, res) => {
   if (!email || !password || !orgName) {
     return res.status(400).json({ error: 'Email, password, dan nama tim wajib diisi' });
   }
-  const users = readJSON('users');
-  const existing = Object.values(users).find((u) => u.email.toLowerCase() === email.toLowerCase());
-  if (existing) return res.status(409).json({ error: 'Email sudah terdaftar' });
+  const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+  if (existing.rows[0]) return res.status(409).json({ error: 'Email sudah terdaftar' });
 
-  const orgs = readJSON('orgs');
   const orgId = genId('org');
-  orgs[orgId] = {
-    id: orgId,
-    name: orgName,
-    plan: 'free',
-    subscriptionExpiresAt: null,
-    createdAt: Date.now()
-  };
-  await writeJSON('orgs', orgs);
+  await pool.query(
+    'INSERT INTO orgs (id, name, plan, subscription_expires_at, created_at) VALUES ($1,$2,$3,$4,$5)',
+    [orgId, orgName, 'free', null, Date.now()]
+  );
 
   const userId = genId('user');
   const passwordHash = await bcrypt.hash(password, 10);
-  users[userId] = { id: userId, email, passwordHash, orgId, role: 'owner', createdAt: Date.now() };
-  await writeJSON('users', users);
+  await pool.query(
+    'INSERT INTO users (id, email, password_hash, org_id, role, created_at) VALUES ($1,$2,$3,$4,$5,$6)',
+    [userId, email, passwordHash, orgId, 'owner', Date.now()]
+  );
 
   createSessionCookie(res, { userId, email, orgId });
   res.json({ ok: true });
@@ -99,14 +98,14 @@ app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email dan password wajib diisi' });
 
-  const users = readJSON('users');
-  const user = Object.values(users).find((u) => u.email.toLowerCase() === email.toLowerCase());
+  const r = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+  const user = r.rows[0];
   if (!user) return res.status(401).json({ error: 'Email atau password salah' });
 
-  const match = await bcrypt.compare(password, user.passwordHash);
+  const match = await bcrypt.compare(password, user.password_hash);
   if (!match) return res.status(401).json({ error: 'Email atau password salah' });
 
-  createSessionCookie(res, { userId: user.id, email: user.email, orgId: user.orgId });
+  createSessionCookie(res, { userId: user.id, email: user.email, orgId: user.org_id });
   res.json({ ok: true });
 });
 
@@ -115,16 +114,15 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/me', requireAuth, (req, res) => {
-  const orgs = readJSON('orgs');
-  const org = orgs[req.user.orgId];
+app.get('/api/me', requireAuth, async (req, res) => {
+  const org = await getOrg(req.user.orgId);
   res.json({
     email: req.user.email,
     org: org ? {
       id: org.id,
       name: org.name,
       plan: isOrgPro(org) ? 'pro' : 'free',
-      subscriptionExpiresAt: org.subscriptionExpiresAt
+      subscriptionExpiresAt: org.subscription_expires_at
     } : null,
     freeSnippetLimit: FREE_SNIPPET_LIMIT
   });
@@ -133,22 +131,21 @@ app.get('/api/me', requireAuth, (req, res) => {
 // ---------------------------------------------------------------------------
 // Snippets (riwayat kode) — dipisah per tim (orgId)
 // ---------------------------------------------------------------------------
-app.get('/api/snippets', requireAuth, (req, res) => {
-  const all = readJSON('snippets');
-  const list = Object.values(all)
-    .filter((s) => s.orgId === req.user.orgId)
-    .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
-  res.json(list);
+app.get('/api/snippets', requireAuth, async (req, res) => {
+  const r = await pool.query(
+    'SELECT id, name, type, code, saved_at AS "savedAt" FROM snippets WHERE org_id = $1 ORDER BY saved_at DESC',
+    [req.user.orgId]
+  );
+  res.json(r.rows);
 });
 
 app.post('/api/snippets', requireAuth, async (req, res) => {
   const { name, type, code } = req.body || {};
   if (!code) return res.status(400).json({ error: 'code wajib diisi' });
 
-  const orgs = readJSON('orgs');
-  const org = orgs[req.user.orgId];
-  const all = readJSON('snippets');
-  const currentCount = Object.values(all).filter((s) => s.orgId === req.user.orgId).length;
+  const org = await getOrg(req.user.orgId);
+  const countRes = await pool.query('SELECT COUNT(*)::int AS c FROM snippets WHERE org_id = $1', [req.user.orgId]);
+  const currentCount = countRes.rows[0].c;
 
   if (!isOrgPro(org) && currentCount >= FREE_SNIPPET_LIMIT) {
     return res.status(402).json({
@@ -158,42 +155,42 @@ app.post('/api/snippets', requireAuth, async (req, res) => {
   }
 
   const id = genId('snip');
-  const item = { id, orgId: req.user.orgId, name: name || 'Tanpa nama', type: type || 'react', code, savedAt: Date.now() };
-  all[id] = item;
-  await writeJSON('snippets', all);
-  res.json(item);
+  const savedAt = Date.now();
+  await pool.query(
+    'INSERT INTO snippets (id, org_id, name, type, code, saved_at) VALUES ($1,$2,$3,$4,$5,$6)',
+    [id, req.user.orgId, name || 'Tanpa nama', type || 'react', code, savedAt]
+  );
+  res.json({ id, orgId: req.user.orgId, name: name || 'Tanpa nama', type: type || 'react', code, savedAt });
 });
 
 app.delete('/api/snippets/:id', requireAuth, async (req, res) => {
-  const all = readJSON('snippets');
-  const item = all[req.params.id];
-  if (!item || item.orgId !== req.user.orgId) return res.status(404).json({ error: 'tidak ditemukan' });
-  delete all[req.params.id];
-  await writeJSON('snippets', all);
+  const r = await pool.query('DELETE FROM snippets WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
+  if (r.rowCount === 0) return res.status(404).json({ error: 'tidak ditemukan' });
   res.json({ ok: true });
 });
 
 // ---------------------------------------------------------------------------
 // Data live preview (tiruan Firestore), dipisah per tim + per project
 // ---------------------------------------------------------------------------
-app.get('/api/data/:projectId', requireAuth, (req, res) => {
-  const store = readJSON('store');
-  const orgStore = store[req.user.orgId] || {};
-  res.json(orgStore[req.params.projectId] || {});
+app.get('/api/data/:projectId', requireAuth, async (req, res) => {
+  const r = await pool.query(
+    'SELECT data FROM project_data WHERE org_id = $1 AND project_id = $2',
+    [req.user.orgId, req.params.projectId]
+  );
+  res.json(r.rows[0] ? r.rows[0].data : {});
 });
 
 app.post('/api/data/:projectId', requireAuth, async (req, res) => {
-  const store = readJSON('store');
-  if (!store[req.user.orgId]) store[req.user.orgId] = {};
-  store[req.user.orgId][req.params.projectId] = req.body || {};
-  await writeJSON('store', store);
+  await pool.query(
+    `INSERT INTO project_data (org_id, project_id, data) VALUES ($1,$2,$3)
+     ON CONFLICT (org_id, project_id) DO UPDATE SET data = $3`,
+    [req.user.orgId, req.params.projectId, req.body || {}]
+  );
   res.json({ ok: true });
 });
 
 app.delete('/api/data/:projectId', requireAuth, async (req, res) => {
-  const store = readJSON('store');
-  if (store[req.user.orgId]) delete store[req.user.orgId][req.params.projectId];
-  await writeJSON('store', store);
+  await pool.query('DELETE FROM project_data WHERE org_id = $1 AND project_id = $2', [req.user.orgId, req.params.projectId]);
   res.json({ ok: true });
 });
 
@@ -202,13 +199,12 @@ app.delete('/api/data/:projectId', requireAuth, async (req, res) => {
 // ---------------------------------------------------------------------------
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-app.get('/api/publish', requireAuth, (req, res) => {
-  const all = readJSON('publishes');
-  const list = Object.values(all)
-    .filter((p) => p.orgId === req.user.orgId)
-    .map((p) => ({ slug: p.slug, customDomain: p.customDomain, type: p.type, updatedAt: p.updatedAt }))
-    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  res.json(list);
+app.get('/api/publish', requireAuth, async (req, res) => {
+  const r = await pool.query(
+    'SELECT slug, custom_domain AS "customDomain", type, updated_at AS "updatedAt" FROM publishes WHERE org_id = $1 ORDER BY updated_at DESC',
+    [req.user.orgId]
+  );
+  res.json(r.rows);
 });
 
 app.post('/api/publish', requireAuth, async (req, res) => {
@@ -218,109 +214,94 @@ app.post('/api/publish', requireAuth, async (req, res) => {
   }
   if (!html) return res.status(400).json({ error: 'Gak ada konten buat dipublish' });
 
-  const all = readJSON('publishes');
-  const existing = all[slug];
-  if (existing && existing.orgId !== req.user.orgId) {
+  const existingRes = await pool.query('SELECT * FROM publishes WHERE slug = $1', [slug]);
+  const existing = existingRes.rows[0];
+  if (existing && existing.org_id !== req.user.orgId) {
     return res.status(409).json({ error: 'Slug "' + slug + '" sudah dipakai tim lain. Coba slug lain.' });
   }
 
   if (customDomain) {
-    const domainTaken = Object.values(all).find(
-      (p) => p.customDomain && p.customDomain.toLowerCase() === customDomain.toLowerCase() && p.slug !== slug
+    const domainTaken = await pool.query(
+      'SELECT slug FROM publishes WHERE LOWER(custom_domain) = LOWER($1) AND slug != $2',
+      [customDomain, slug]
     );
-    if (domainTaken) {
+    if (domainTaken.rows[0]) {
       return res.status(409).json({ error: 'Domain "' + customDomain + '" sudah dipakai project lain.' });
     }
   }
 
-  all[slug] = {
-    slug,
-    orgId: req.user.orgId,
-    customDomain: customDomain || null,
-    html,
-    type: type || 'react',
-    createdAt: existing ? existing.createdAt : Date.now(),
-    updatedAt: Date.now()
-  };
-  await writeJSON('publishes', all);
+  const now = Date.now();
+  await pool.query(
+    `INSERT INTO publishes (slug, org_id, custom_domain, html, type, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
+     ON CONFLICT (slug) DO UPDATE SET custom_domain = $3, html = $4, type = $5, updated_at = $7`,
+    [slug, req.user.orgId, customDomain || null, html, type || 'react', existing ? existing.created_at : now, now]
+  );
 
-  // Data live cuma diisi dari preview kalau ini publish PERTAMA KALI.
-  // Kalau republish, data yang sudah hidup di halaman publik gak ditimpa.
   if (!existing && initialData) {
-    const publicData = readJSON('publicData');
-    publicData[slug] = initialData;
-    await writeJSON('publicData', publicData);
+    await pool.query(
+      `INSERT INTO public_data (slug, data) VALUES ($1,$2)
+       ON CONFLICT (slug) DO NOTHING`,
+      [slug, initialData]
+    );
   }
 
   res.json({ ok: true, slug, url: '/p/' + slug });
 });
 
 app.delete('/api/publish/:slug', requireAuth, async (req, res) => {
-  const all = readJSON('publishes');
-  const item = all[req.params.slug];
-  if (!item || item.orgId !== req.user.orgId) return res.status(404).json({ error: 'tidak ditemukan' });
-  delete all[req.params.slug];
-  await writeJSON('publishes', all);
-  const publicData = readJSON('publicData');
-  delete publicData[req.params.slug];
-  await writeJSON('publicData', publicData);
+  const r = await pool.query('DELETE FROM publishes WHERE slug = $1 AND org_id = $2', [req.params.slug, req.user.orgId]);
+  if (r.rowCount === 0) return res.status(404).json({ error: 'tidak ditemukan' });
   res.json({ ok: true });
 });
 
-// Reset data live halaman publish (cuma pemilik tim yang boleh)
 app.delete('/api/publish/:slug/data', requireAuth, async (req, res) => {
-  const all = readJSON('publishes');
-  const item = all[req.params.slug];
-  if (!item || item.orgId !== req.user.orgId) return res.status(404).json({ error: 'tidak ditemukan' });
-  const publicData = readJSON('publicData');
-  delete publicData[req.params.slug];
-  await writeJSON('publicData', publicData);
+  const ownRes = await pool.query('SELECT slug FROM publishes WHERE slug = $1 AND org_id = $2', [req.params.slug, req.user.orgId]);
+  if (!ownRes.rows[0]) return res.status(404).json({ error: 'tidak ditemukan' });
+  await pool.query('DELETE FROM public_data WHERE slug = $1', [req.params.slug]);
   res.json({ ok: true });
 });
 
 // ---------------------------------------------------------------------------
-// Data live buat halaman yang SUDAH dipublish — publik (tanpa login), karena
-// yang buka ini adalah pengunjung situs itu sendiri (misal buka panel admin
-// bawaan kode-nya). Tetap dicek slug-nya beneran terdaftar biar gak asal isi.
+// Data live buat halaman yang SUDAH dipublish — publik (tanpa login)
 // ---------------------------------------------------------------------------
-app.get('/api/public-data/:slug', (req, res) => {
-  const publishes = readJSON('publishes');
-  if (!publishes[req.params.slug]) return res.status(404).json({ error: 'slug tidak ditemukan' });
-  const publicData = readJSON('publicData');
-  res.json(publicData[req.params.slug] || {});
+app.get('/api/public-data/:slug', async (req, res) => {
+  const exists = await pool.query('SELECT slug FROM publishes WHERE slug = $1', [req.params.slug]);
+  if (!exists.rows[0]) return res.status(404).json({ error: 'slug tidak ditemukan' });
+  const r = await pool.query('SELECT data FROM public_data WHERE slug = $1', [req.params.slug]);
+  res.json(r.rows[0] ? r.rows[0].data : {});
 });
 
 app.post('/api/public-data/:slug', async (req, res) => {
-  const publishes = readJSON('publishes');
-  if (!publishes[req.params.slug]) return res.status(404).json({ error: 'slug tidak ditemukan' });
-  const publicData = readJSON('publicData');
-  publicData[req.params.slug] = req.body || {};
-  await writeJSON('publicData', publicData);
+  const exists = await pool.query('SELECT slug FROM publishes WHERE slug = $1', [req.params.slug]);
+  if (!exists.rows[0]) return res.status(404).json({ error: 'slug tidak ditemukan' });
+  await pool.query(
+    `INSERT INTO public_data (slug, data) VALUES ($1,$2)
+     ON CONFLICT (slug) DO UPDATE SET data = $2`,
+    [req.params.slug, req.body || {}]
+  );
   res.json({ ok: true });
 });
 
 // ---------------------------------------------------------------------------
 // Billing (Midtrans)
 // ---------------------------------------------------------------------------
-app.get('/api/billing/info', requireAuth, (req, res) => {
-  const orgs = readJSON('orgs');
-  const org = orgs[req.user.orgId];
+app.get('/api/billing/info', requireAuth, async (req, res) => {
+  const org = await getOrg(req.user.orgId);
   res.json({ price: PRO_PRICE, clientKey: CLIENT_KEY, plan: isOrgPro(org) ? 'pro' : 'free' });
 });
 
 app.post('/api/billing/checkout', requireAuth, async (req, res) => {
   try {
-    const orgs = readJSON('orgs');
-    const org = orgs[req.user.orgId];
+    const org = await getOrg(req.user.orgId);
     if (!org) return res.status(404).json({ error: 'Tim tidak ditemukan' });
-    const result = await createProCheckout(org, req.user);
+    const result = await createProCheckout({ id: org.id }, req.user);
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: 'Gagal membuat transaksi. Cek MIDTRANS_SERVER_KEY di server. Detail: ' + e.message });
   }
 });
 
-// Midtrans akan kirim notifikasi ke sini tiap ada perubahan status pembayaran
 app.post('/api/billing/webhook', async (req, res) => {
   try {
     const notif = req.body || {};
@@ -336,16 +317,13 @@ app.post('/api/billing/webhook', async (req, res) => {
     }
 
     if (transaction_status === 'capture' || transaction_status === 'settlement') {
-      // order_id formatnya: PRO-<orgId>-<timestamp>
       const parts = String(order_id).split('-');
       const orgId = parts.length >= 3 ? parts.slice(1, -1).join('-') : null;
       if (orgId) {
-        const orgs = readJSON('orgs');
-        if (orgs[orgId]) {
-          orgs[orgId].plan = 'pro';
-          orgs[orgId].subscriptionExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
-          await writeJSON('orgs', orgs);
-        }
+        await pool.query(
+          'UPDATE orgs SET plan = $1, subscription_expires_at = $2 WHERE id = $3',
+          ['pro', Date.now() + 30 * 24 * 60 * 60 * 1000, orgId]
+        );
       }
     }
     res.json({ ok: true });
@@ -354,6 +332,13 @@ app.post('/api/billing/webhook', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log('Live Preview Studio (SaaS) jalan di http://localhost:' + PORT);
-});
+migrate()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log('Live Preview Studio (SaaS + Postgres) jalan di http://localhost:' + PORT);
+    });
+  })
+  .catch((e) => {
+    console.error('Gagal konek/setup database:', e.message);
+    process.exit(1);
+  });
