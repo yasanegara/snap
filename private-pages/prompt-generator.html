@@ -234,15 +234,34 @@
 
 <script>
 // ---------- Section yang bisa di-setup detailnya kalau aktif ----------
+// listConfig: kalau section punya ini, dia dapat form daftar item (bukan cuma teks bebas)
+const listConfigs = {
+  pricing: { itemLabel: 'Paket', addLabel: '+ Tambah Paket', fields: [
+    { key: 'nama', ph: 'Nama paket' }, { key: 'harga', ph: 'Harga' }, { key: 'fasilitas', ph: 'Fasilitas/includes' }
+  ]},
+  faq: { itemLabel: 'FAQ', addLabel: '+ Tambah Pertanyaan', fields: [
+    { key: 'pertanyaan', ph: 'Pertanyaan' }, { key: 'jawaban', ph: 'Jawaban' }
+  ]},
+  testimonials: { itemLabel: 'Testimoni', addLabel: '+ Tambah Testimoni', fields: [
+    { key: 'nama', ph: 'Nama pelanggan' }, { key: 'peran', ph: 'Peran / produk yang dibeli' }, { key: 'isi', ph: 'Isi testimoni' }
+  ]}
+};
+
+function emptyItem(cfg){
+  const obj = {};
+  cfg.fields.forEach(f => obj[f.key] = '');
+  return obj;
+}
+
 const sectionDefs = [
   { id: 'hero', label: 'Hero', val: 'Hero (banner utama)', active: true, detail: '' },
   { id: 'about', label: 'Tentang', val: 'Tentang Kami', active: true, detail: '' },
   { id: 'services', label: 'Layanan/Produk', val: 'Layanan/Produk', active: true, detail: '' },
   { id: 'advantages', label: 'Keunggulan', val: 'Keunggulan/Kenapa Pilih Kami', active: false, detail: '' },
-  { id: 'testimonials', label: 'Testimoni', val: 'Testimoni Pelanggan', active: true, detail: '' },
+  { id: 'testimonials', label: 'Testimoni', val: 'Testimoni Pelanggan', active: true, detail: '', items: [emptyItem(listConfigs.testimonials)] },
   { id: 'gallery', label: 'Galeri', val: 'Galeri Foto', active: false, detail: '' },
-  { id: 'pricing', label: 'Harga/Paket', val: 'Daftar Harga/Paket', active: false, detail: '', packages: [{ nama: '', harga: '', fasilitas: '' }] },
-  { id: 'faq', label: 'FAQ', val: 'FAQ', active: false, detail: '' },
+  { id: 'pricing', label: 'Harga/Paket', val: 'Daftar Harga/Paket', active: false, detail: '', items: [emptyItem(listConfigs.pricing)] },
+  { id: 'faq', label: 'FAQ', val: 'FAQ', active: false, detail: '', items: [emptyItem(listConfigs.faq)] },
   { id: 'contact', label: 'Kontak', val: 'Kontak & Lokasi', active: true, detail: '' }
 ];
 
@@ -270,36 +289,34 @@ function renderSections() {
       ta.addEventListener('input', (e) => { sec.detail = e.target.value; });
       detail.appendChild(ta);
 
-      if (sec.id === 'pricing') {
-        const pkgWrap = document.createElement('div');
-        pkgWrap.style.marginTop = '10px';
-        function renderPackages() {
-          pkgWrap.innerHTML = '';
-          sec.packages.forEach((pkg, idx) => {
+      const cfg = listConfigs[sec.id];
+      if (cfg) {
+        const listWrap = document.createElement('div');
+        listWrap.style.marginTop = '10px';
+        function renderItems() {
+          listWrap.innerHTML = '';
+          sec.items.forEach((it, idx) => {
             const row = document.createElement('div');
             row.className = 'pkg-row';
-            const nameInput = document.createElement('input');
-            nameInput.type = 'text'; nameInput.placeholder = 'Nama paket'; nameInput.value = pkg.nama;
-            nameInput.addEventListener('input', e => pkg.nama = e.target.value);
-            const priceInput = document.createElement('input');
-            priceInput.type = 'text'; priceInput.placeholder = 'Harga'; priceInput.value = pkg.harga;
-            priceInput.addEventListener('input', e => pkg.harga = e.target.value);
-            const facInput = document.createElement('input');
-            facInput.type = 'text'; facInput.placeholder = 'Fasilitas/includes'; facInput.value = pkg.fasilitas;
-            facInput.addEventListener('input', e => pkg.fasilitas = e.target.value);
+            cfg.fields.forEach(f => {
+              const input = document.createElement('input');
+              input.type = 'text'; input.placeholder = f.ph; input.value = it[f.key];
+              input.addEventListener('input', e => it[f.key] = e.target.value);
+              row.appendChild(input);
+            });
             const removeBtn = document.createElement('button');
-            removeBtn.className = 'pkg-remove'; removeBtn.textContent = '✕'; removeBtn.title = 'Hapus paket';
-            removeBtn.addEventListener('click', () => { sec.packages.splice(idx, 1); renderPackages(); });
-            row.appendChild(nameInput); row.appendChild(priceInput); row.appendChild(facInput); row.appendChild(removeBtn);
-            pkgWrap.appendChild(row);
+            removeBtn.className = 'pkg-remove'; removeBtn.textContent = '✕'; removeBtn.title = 'Hapus';
+            removeBtn.addEventListener('click', () => { sec.items.splice(idx, 1); renderItems(); });
+            row.appendChild(removeBtn);
+            listWrap.appendChild(row);
           });
           const addBtn = document.createElement('button');
-          addBtn.className = 'pkg-add'; addBtn.textContent = '+ Tambah Paket';
-          addBtn.addEventListener('click', () => { sec.packages.push({ nama: '', harga: '', fasilitas: '' }); renderPackages(); });
-          pkgWrap.appendChild(addBtn);
+          addBtn.className = 'pkg-add'; addBtn.textContent = cfg.addLabel;
+          addBtn.addEventListener('click', () => { sec.items.push(emptyItem(cfg)); renderItems(); });
+          listWrap.appendChild(addBtn);
         }
-        renderPackages();
-        detail.appendChild(pkgWrap);
+        renderItems();
+        detail.appendChild(listWrap);
       }
 
       item.appendChild(detail);
@@ -359,11 +376,16 @@ document.getElementById('generateBtn').addEventListener('click', () => {
   const sectionList = sections.length ? sections.map(s => {
     let line = '- ' + s.val;
     if (s.detail && s.detail.trim()) line += '\n  Detail: ' + s.detail.trim();
-    if (s.id === 'pricing' && s.packages && s.packages.some(p => p.nama.trim())) {
-      line += '\n  Daftar paket:';
-      s.packages.filter(p => p.nama.trim()).forEach(p => {
-        line += '\n    * ' + p.nama + (p.harga ? ' — ' + p.harga : '') + (p.fasilitas ? ' (' + p.fasilitas + ')' : '');
-      });
+    const cfg = listConfigs[s.id];
+    if (cfg && s.items) {
+      const filled = s.items.filter(it => Object.values(it).some(v => v && v.trim()));
+      if (filled.length) {
+        line += '\n  Daftar ' + cfg.itemLabel + ':';
+        filled.forEach(it => {
+          const parts = cfg.fields.map(f => it[f.key] && it[f.key].trim()).filter(Boolean);
+          line += '\n    * ' + parts.join(' — ');
+        });
+      }
     }
     return line;
   }).join('\n') : '- (bebas, tentukan sendiri section yang relevan)';
@@ -383,9 +405,9 @@ document.getElementById('generateBtn').addEventListener('click', () => {
 '=====================================================\n\n' +
 '1. STRUKTUR FILE\n' +
 'Buat sebagai SATU file HTML utuh (<!DOCTYPE html> sampai </html>), dengan:\n' +
-'- Tailwind CSS lewat <script src="https://cdn.tailwindcss.com"></script>\n' +
-'- React 18 + ReactDOM lewat <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script> dan react-dom versi UMD yang sama\n' +
-'- Babel Standalone lewat <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>\n' +
+'- Tailwind CSS lewat <script src="https://cdn.tailwindcss.com"><\/script>\n' +
+'- React 18 + ReactDOM lewat <script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script> dan react-dom versi UMD yang sama\n' +
+'- Babel Standalone lewat <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>\n' +
 '- Semua komponen React ditulis di dalam SATU <script type="text/babel"> di akhir <body>\n' +
 '- JANGAN pakai import/export, JANGAN pakai file terpisah, JANGAN pakai Firebase\n\n' +
 '2. MODEL DATA\n' +
