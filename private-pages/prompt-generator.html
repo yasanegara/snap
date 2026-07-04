@@ -61,6 +61,22 @@
   .result-toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .result-toolbar span{ font-size:12px; color:var(--muted); }
   .empty-state{ color:var(--muted); font-size:13px; text-align:center; padding:60px 20px; }
+
+  .section-item{ border:1px solid var(--line); border-radius:10px; margin-bottom:8px; overflow:hidden; }
+  .section-item-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px; cursor:pointer; background:var(--panel-2);
+  }
+  .section-item-head.active{ background:var(--accent-dim); }
+  .section-item-head .name{ font-size:13px; font-weight:600; }
+  .section-item-head .name.active-text{ color:var(--accent); }
+  .section-item-head .dash{ font-size:11px; color:var(--muted); }
+  .section-detail{ padding:14px; background:#0d0f12; border-top:1px solid var(--line); }
+  .section-detail textarea{ min-height:50px; }
+  .pkg-row{ display:flex; gap:8px; margin-bottom:8px; align-items:flex-start; }
+  .pkg-row input{ flex:1; }
+  .pkg-remove{ background:none; border:none; color:#ff6b6b; cursor:pointer; font-size:16px; padding:6px; flex-shrink:0; }
+  .pkg-add{ background:none; border:1px dashed var(--line); color:var(--accent); border-radius:6px; padding:7px 12px; font-size:12px; cursor:pointer; width:100%; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -92,17 +108,8 @@
 
     <div class="field">
       <label>Section yang Mau Ada</label>
-      <div class="chip-group" id="sectionChips">
-        <div class="chip active" data-val="Hero (banner utama)">Hero</div>
-        <div class="chip active" data-val="Tentang Kami">Tentang</div>
-        <div class="chip active" data-val="Layanan/Produk">Layanan/Produk</div>
-        <div class="chip" data-val="Keunggulan/Kenapa Pilih Kami">Keunggulan</div>
-        <div class="chip active" data-val="Testimoni Pelanggan">Testimoni</div>
-        <div class="chip" data-val="Galeri Foto">Galeri</div>
-        <div class="chip" data-val="Daftar Harga/Paket">Harga/Paket</div>
-        <div class="chip" data-val="FAQ">FAQ</div>
-        <div class="chip active" data-val="Kontak & Lokasi">Kontak</div>
-      </div>
+      <p class="hint" style="margin-top:-4px;margin-bottom:10px;">Klik nama section buat aktif/nonaktifkan. Kalau aktif, muncul kotak buat isi detailnya.</p>
+      <div id="sectionsContainer"></div>
     </div>
 
     <div class="field">
@@ -226,6 +233,83 @@
 </script>
 
 <script>
+// ---------- Section yang bisa di-setup detailnya kalau aktif ----------
+const sectionDefs = [
+  { id: 'hero', label: 'Hero', val: 'Hero (banner utama)', active: true, detail: '' },
+  { id: 'about', label: 'Tentang', val: 'Tentang Kami', active: true, detail: '' },
+  { id: 'services', label: 'Layanan/Produk', val: 'Layanan/Produk', active: true, detail: '' },
+  { id: 'advantages', label: 'Keunggulan', val: 'Keunggulan/Kenapa Pilih Kami', active: false, detail: '' },
+  { id: 'testimonials', label: 'Testimoni', val: 'Testimoni Pelanggan', active: true, detail: '' },
+  { id: 'gallery', label: 'Galeri', val: 'Galeri Foto', active: false, detail: '' },
+  { id: 'pricing', label: 'Harga/Paket', val: 'Daftar Harga/Paket', active: false, detail: '', packages: [{ nama: '', harga: '', fasilitas: '' }] },
+  { id: 'faq', label: 'FAQ', val: 'FAQ', active: false, detail: '' },
+  { id: 'contact', label: 'Kontak', val: 'Kontak & Lokasi', active: true, detail: '' }
+];
+
+function renderSections() {
+  const wrap = document.getElementById('sectionsContainer');
+  wrap.innerHTML = '';
+  sectionDefs.forEach(sec => {
+    const item = document.createElement('div');
+    item.className = 'section-item';
+
+    const head = document.createElement('div');
+    head.className = 'section-item-head' + (sec.active ? ' active' : '');
+    head.innerHTML = '<span class="name' + (sec.active ? ' active-text' : '') + '">' + sec.label + '</span>' +
+      '<span class="dash">' + (sec.active ? '✓ aktif — klik detail di bawah' : 'nonaktif, klik buat aktifkan') + '</span>';
+    head.addEventListener('click', () => { sec.active = !sec.active; renderSections(); });
+    item.appendChild(head);
+
+    if (sec.active) {
+      const detail = document.createElement('div');
+      detail.className = 'section-detail';
+
+      const ta = document.createElement('textarea');
+      ta.placeholder = 'Detail tambahan buat section ini (opsional), misal: poin-poin yang wajib disebutkan';
+      ta.value = sec.detail;
+      ta.addEventListener('input', (e) => { sec.detail = e.target.value; });
+      detail.appendChild(ta);
+
+      if (sec.id === 'pricing') {
+        const pkgWrap = document.createElement('div');
+        pkgWrap.style.marginTop = '10px';
+        function renderPackages() {
+          pkgWrap.innerHTML = '';
+          sec.packages.forEach((pkg, idx) => {
+            const row = document.createElement('div');
+            row.className = 'pkg-row';
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text'; nameInput.placeholder = 'Nama paket'; nameInput.value = pkg.nama;
+            nameInput.addEventListener('input', e => pkg.nama = e.target.value);
+            const priceInput = document.createElement('input');
+            priceInput.type = 'text'; priceInput.placeholder = 'Harga'; priceInput.value = pkg.harga;
+            priceInput.addEventListener('input', e => pkg.harga = e.target.value);
+            const facInput = document.createElement('input');
+            facInput.type = 'text'; facInput.placeholder = 'Fasilitas/includes'; facInput.value = pkg.fasilitas;
+            facInput.addEventListener('input', e => pkg.fasilitas = e.target.value);
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'pkg-remove'; removeBtn.textContent = '✕'; removeBtn.title = 'Hapus paket';
+            removeBtn.addEventListener('click', () => { sec.packages.splice(idx, 1); renderPackages(); });
+            row.appendChild(nameInput); row.appendChild(priceInput); row.appendChild(facInput); row.appendChild(removeBtn);
+            pkgWrap.appendChild(row);
+          });
+          const addBtn = document.createElement('button');
+          addBtn.className = 'pkg-add'; addBtn.textContent = '+ Tambah Paket';
+          addBtn.addEventListener('click', () => { sec.packages.push({ nama: '', harga: '', fasilitas: '' }); renderPackages(); });
+          pkgWrap.appendChild(addBtn);
+        }
+        renderPackages();
+        detail.appendChild(pkgWrap);
+      }
+
+      item.appendChild(detail);
+    }
+
+    wrap.appendChild(item);
+  });
+}
+renderSections();
+
 document.querySelectorAll('.chip').forEach(chip => {
   chip.addEventListener('click', () => chip.classList.toggle('active'));
 });
@@ -253,7 +337,7 @@ document.getElementById('generateBtn').addEventListener('click', () => {
   const bizName = document.getElementById('bizName').value.trim() || '(isi nama bisnis)';
   const bizType = document.getElementById('bizType').value.trim() || '(isi jenis bisnis)';
   const bizAudience = document.getElementById('bizAudience').value.trim() || '(isi target audiens)';
-  const sections = getActiveVals('sectionChips');
+  const sections = sectionDefs.filter(s => s.active);
   const style = document.getElementById('styleSelect').value;
   const activeColor = document.querySelector('#colorSwatches .active');
   const color = activeColor ? activeColor.dataset.val : 'gold/amber (#D97706)';
@@ -272,7 +356,17 @@ document.getElementById('generateBtn').addEventListener('click', () => {
   const contractHooks = document.getElementById('contractHooks').textContent.trim();
   const contractUploader = document.getElementById('contractUploader').textContent.trim();
 
-  const sectionList = sections.length ? sections.map(s => '- ' + s).join('\n') : '- (bebas, tentukan sendiri section yang relevan)';
+  const sectionList = sections.length ? sections.map(s => {
+    let line = '- ' + s.val;
+    if (s.detail && s.detail.trim()) line += '\n  Detail: ' + s.detail.trim();
+    if (s.id === 'pricing' && s.packages && s.packages.some(p => p.nama.trim())) {
+      line += '\n  Daftar paket:';
+      s.packages.filter(p => p.nama.trim()).forEach(p => {
+        line += '\n    * ' + p.nama + (p.harga ? ' — ' + p.harga : '') + (p.fasilitas ? ' (' + p.fasilitas + ')' : '');
+      });
+    }
+    return line;
+  }).join('\n') : '- (bebas, tentukan sendiri section yang relevan)';
   const featureList = features.length ? features.map(f => '- ' + f).join('\n') : '- (tidak ada fitur tambahan khusus)';
 
   const prompt = 'Buatkan saya SATU FILE HTML lengkap (bukan React project terpisah) untuk website bisnis berikut:\n\n' +
