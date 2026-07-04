@@ -77,6 +77,8 @@
   .pkg-row input{ flex:1; }
   .pkg-remove{ background:none; border:none; color:#ff6b6b; cursor:pointer; font-size:16px; padding:6px; flex-shrink:0; }
   .pkg-add{ background:none; border:1px dashed var(--line); color:var(--accent); border-radius:6px; padding:7px 12px; font-size:12px; cursor:pointer; width:100%; margin-top:4px; }
+  .toggle{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:#c7ccd4; cursor:pointer; user-select:none; }
+  .toggle input{ width:15px; height:15px; }
 </style>
 </head>
 <body>
@@ -254,15 +256,15 @@ function emptyItem(cfg){
 }
 
 const sectionDefs = [
-  { id: 'hero', label: 'Hero', val: 'Hero (banner utama)', active: true, detail: '' },
-  { id: 'about', label: 'Tentang', val: 'Tentang Kami', active: true, detail: '' },
-  { id: 'services', label: 'Layanan/Produk', val: 'Layanan/Produk', active: true, detail: '' },
-  { id: 'advantages', label: 'Keunggulan', val: 'Keunggulan/Kenapa Pilih Kami', active: false, detail: '' },
-  { id: 'testimonials', label: 'Testimoni', val: 'Testimoni Pelanggan', active: true, detail: '', items: [emptyItem(listConfigs.testimonials)] },
-  { id: 'gallery', label: 'Galeri', val: 'Galeri Foto', active: false, detail: '' },
-  { id: 'pricing', label: 'Harga/Paket', val: 'Daftar Harga/Paket', active: false, detail: '', items: [emptyItem(listConfigs.pricing)] },
-  { id: 'faq', label: 'FAQ', val: 'FAQ', active: false, detail: '', items: [emptyItem(listConfigs.faq)] },
-  { id: 'contact', label: 'Kontak', val: 'Kontak & Lokasi', active: true, detail: '' }
+  { id: 'hero', label: 'Hero', val: 'Hero (banner utama)', active: true, detail: '', foto: true },
+  { id: 'about', label: 'Tentang', val: 'Tentang Kami', active: true, detail: '', foto: true },
+  { id: 'services', label: 'Layanan/Produk', val: 'Layanan/Produk', active: true, detail: '', foto: true },
+  { id: 'advantages', label: 'Keunggulan', val: 'Keunggulan/Kenapa Pilih Kami', active: false, detail: '', foto: false },
+  { id: 'testimonials', label: 'Testimoni', val: 'Testimoni Pelanggan', active: true, detail: '', foto: false, items: [emptyItem(listConfigs.testimonials)] },
+  { id: 'gallery', label: 'Galeri', val: 'Galeri Foto', active: false, detail: '', foto: true },
+  { id: 'pricing', label: 'Harga/Paket', val: 'Daftar Harga/Paket', active: false, detail: '', foto: false, items: [emptyItem(listConfigs.pricing)] },
+  { id: 'faq', label: 'FAQ', val: 'FAQ', active: false, detail: '', foto: false, items: [emptyItem(listConfigs.faq)] },
+  { id: 'contact', label: 'Kontak', val: 'Kontak & Lokasi', active: true, detail: '', foto: true }
 ];
 
 function renderSections() {
@@ -288,6 +290,16 @@ function renderSections() {
       ta.value = sec.detail;
       ta.addEventListener('input', (e) => { sec.detail = e.target.value; });
       detail.appendChild(ta);
+
+      const fotoRow = document.createElement('label');
+      fotoRow.className = 'toggle';
+      fotoRow.style.marginTop = '10px';
+      const fotoCb = document.createElement('input');
+      fotoCb.type = 'checkbox'; fotoCb.checked = sec.foto;
+      fotoCb.addEventListener('change', (e) => { sec.foto = e.target.checked; });
+      fotoRow.appendChild(fotoCb);
+      fotoRow.appendChild(document.createTextNode('📷 Section ini butuh upload foto'));
+      detail.appendChild(fotoRow);
 
       const cfg = listConfigs[sec.id];
       if (cfg) {
@@ -374,7 +386,7 @@ document.getElementById('generateBtn').addEventListener('click', () => {
   const contractUploader = document.getElementById('contractUploader').textContent.trim();
 
   const sectionList = sections.length ? sections.map(s => {
-    let line = '- ' + s.val;
+    let line = '- ' + s.val + ' — Upload foto: ' + (s.foto ? 'Ya' : 'Tidak');
     if (s.detail && s.detail.trim()) line += '\n  Detail: ' + s.detail.trim();
     const cfg = listConfigs[s.id];
     if (cfg && s.items) {
@@ -426,6 +438,7 @@ document.getElementById('generateBtn').addEventListener('click', () => {
 'JANGAN PERNAH pakai `URL.createObjectURL(file)` untuk foto yang mau disimpan permanen — itu cuma sementara dan akan hilang saat refresh.\n\n' +
 '5. HALAMAN ADMIN\n' +
 'Buat panel admin (bisa diakses lewat tombol kecil/ikon gear yang gak terlalu mencolok di navbar) yang bisa mengedit semua field di `siteData` sesuai section yang ada. Login admin pakai username "' + adminUsername + '" dan password "' + adminPassword + '" (dicek langsung di kode, gak perlu backend khusus untuk ini).\n\n' +
+'TAMBAHAN WAJIB: Selain tombol gear, buat juga supaya kalau pengunjung membuka website dengan menambahkan `#admin` di akhir URL (contoh: namadomain.com/#admin), halaman login admin langsung otomatis muncul. Caranya: cek `window.location.hash === "#admin"` di komponen App saat pertama kali render (pakai useEffect), kalau cocok maka langsung set tampilan ke halaman login (bukan ke halaman publik).\n\n' +
 '6. RESPONSIVE\n' +
 'Pastikan tampilan rapi di HP (mobile-first) dan desktop.\n\n' +
 'Tolong langsung berikan kode HTML lengkapnya, tanpa penjelasan panjang di luar kode.';
