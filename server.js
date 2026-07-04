@@ -332,6 +332,8 @@ app.post('/api/billing/webhook', async (req, res) => {
   }
 });
 
+console.log('Cek DATABASE_URL:', process.env.DATABASE_URL ? 'ADA (' + process.env.DATABASE_URL.replace(/:[^:@]+@/, ':****@') + ')' : 'KOSONG / TIDAK ADA');
+
 migrate()
   .then(() => {
     app.listen(PORT, () => {
@@ -339,6 +341,7 @@ migrate()
     });
   })
   .catch((e) => {
-    console.error('Gagal konek/setup database:', e.message);
+    console.error('Gagal konek/setup database. Detail error:');
+    console.error(e);
     process.exit(1);
   });
