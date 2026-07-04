@@ -81,8 +81,13 @@
     </div>
 
     <div class="field">
-      <label>Jenis Bisnis & Target Pasar</label>
-      <textarea id="bizDesc" placeholder="misal: Jasa detailing mobil premium di Sleman, target pasarnya pemilik mobil menengah-atas yang peduli perawatan kendaraan"></textarea>
+      <label>Jenis Bisnis</label>
+      <input type="text" id="bizType" placeholder="misal: Jasa detailing mobil premium" />
+    </div>
+
+    <div class="field">
+      <label>Target Audiens</label>
+      <textarea id="bizAudience" placeholder="misal: Pemilik mobil menengah-atas di Sleman yang peduli perawatan kendaraan"></textarea>
     </div>
 
     <div class="field">
@@ -152,6 +157,19 @@
         <option value="Bahasa Indonesia">Bahasa Indonesia</option>
         <option value="English">English</option>
       </select>
+    </div>
+
+    <div class="field">
+      <label>Login Admin Website</label>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;">
+          <input type="text" id="adminUsername" placeholder="Username (misal: admin)" />
+        </div>
+        <div style="flex:1;">
+          <input type="text" id="adminPassword" placeholder="Password (misal: admin123)" />
+        </div>
+      </div>
+      <p class="hint">Ini dipakai sementara buat login ke panel admin di website hasil generate. Nanti bisa diganti sistem login asli dari platform.</p>
     </div>
 
     <button class="btn primary" id="generateBtn">✨ Generate Prompt</button>
@@ -233,7 +251,8 @@ function getActiveVals(containerId) {
 
 document.getElementById('generateBtn').addEventListener('click', () => {
   const bizName = document.getElementById('bizName').value.trim() || '(isi nama bisnis)';
-  const bizDesc = document.getElementById('bizDesc').value.trim() || '(isi deskripsi bisnis)';
+  const bizType = document.getElementById('bizType').value.trim() || '(isi jenis bisnis)';
+  const bizAudience = document.getElementById('bizAudience').value.trim() || '(isi target audiens)';
   const sections = getActiveVals('sectionChips');
   const style = document.getElementById('styleSelect').value;
   const activeColor = document.querySelector('#colorSwatches .active');
@@ -247,6 +266,8 @@ document.getElementById('generateBtn').addEventListener('click', () => {
     return f;
   });
   const lang = document.getElementById('langSelect').value;
+  const adminUsername = document.getElementById('adminUsername').value.trim() || 'admin';
+  const adminPassword = document.getElementById('adminPassword').value.trim() || 'admin123';
 
   const contractHooks = document.getElementById('contractHooks').textContent.trim();
   const contractUploader = document.getElementById('contractUploader').textContent.trim();
@@ -256,7 +277,8 @@ document.getElementById('generateBtn').addEventListener('click', () => {
 
   const prompt = 'Buatkan saya SATU FILE HTML lengkap (bukan React project terpisah) untuk website bisnis berikut:\n\n' +
 'NAMA BISNIS: ' + bizName + '\n' +
-'DESKRIPSI & TARGET PASAR: ' + bizDesc + '\n' +
+'JENIS BISNIS: ' + bizType + '\n' +
+'TARGET AUDIENS: ' + bizAudience + '\n' +
 'BAHASA KONTEN: ' + lang + '\n\n' +
 'SECTION YANG HARUS ADA:\n' + sectionList + '\n\n' +
 'GAYA VISUAL: ' + style + '\n' +
@@ -287,7 +309,7 @@ document.getElementById('generateBtn').addEventListener('click', () => {
 '```jsx\n' + contractUploader + '\n```\n\n' +
 'JANGAN PERNAH pakai `URL.createObjectURL(file)` untuk foto yang mau disimpan permanen — itu cuma sementara dan akan hilang saat refresh.\n\n' +
 '5. HALAMAN ADMIN\n' +
-'Buat panel admin (bisa diakses lewat tombol kecil/ikon gear yang gak terlalu mencolok di navbar) yang bisa mengedit semua field di `siteData` sesuai section yang ada. Untuk saat ini, pakai login sederhana dulu (username: admin, password: admin123) — ini akan di-upgrade ke sistem login asli oleh platform nanti, jadi jangan bikin logic login yang rumit.\n\n' +
+'Buat panel admin (bisa diakses lewat tombol kecil/ikon gear yang gak terlalu mencolok di navbar) yang bisa mengedit semua field di `siteData` sesuai section yang ada. Login admin pakai username "' + adminUsername + '" dan password "' + adminPassword + '" (dicek langsung di kode, gak perlu backend khusus untuk ini).\n\n' +
 '6. RESPONSIVE\n' +
 'Pastikan tampilan rapi di HP (mobile-first) dan desktop.\n\n' +
 'Tolong langsung berikan kode HTML lengkapnya, tanpa penjelasan panjang di luar kode.';
