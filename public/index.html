@@ -326,11 +326,11 @@ window.__firebaseShim = (function(){
   var __listeners = [];
   var __syncTimer = null;
   function __sync(){
-    if (window.__publishedStatic) return;
     clearTimeout(__syncTimer);
     __syncTimer = setTimeout(function(){
       try {
-        fetch('/api/data/' + encodeURIComponent(window.__projectId), {
+        var base = window.__dataEndpointBase || '/api/data/';
+        fetch(base + encodeURIComponent(window.__projectId), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(__store)
@@ -547,24 +547,16 @@ function buildReactDoc(code, options){
   }
 })();`;
 
-  const projectId = hashCode(code.trim());
+  const dataEndpointBase = options.dataEndpointBase || '/api/data/';
+  const dataKey = options.dataKey || hashCode(code.trim());
   const combined = RUNNER_SHIMS_SRC + '\n' + transformed + '\n' + mountCode;
   const combinedEscaped = JSON.stringify(combined);
 
-  const bootScript = options.publishMode
-    ? `
-  window.__publishedStatic = true;
-  window.__initialFirestoreStore = ${JSON.stringify(options.bakedData || {})};
-  (function(){
-    var s = document.createElement('script');
-    s.textContent = ${combinedEscaped};
-    document.body.appendChild(s);
-  })();`
-    : `
+  const bootScript = `
   // Ambil data yang sudah tersimpan di server DULU, baru jalankan komponennya.
   // Ini penting biar data lama tidak ketiban/ketimpa data bawaan kode tiap kali dibuka.
   (function(){
-    fetch('/api/data/' + encodeURIComponent(window.__projectId))
+    fetch(window.__dataEndpointBase + encodeURIComponent(window.__projectId))
       .then(function(r){ return r.ok ? r.json() : {}; })
       .catch(function(){ return {}; })
       .then(function(store){
@@ -600,11 +592,12 @@ function buildReactDoc(code, options){
 <body>
 <div id="root"></div>
 <div id="error-overlay"></div>
-${options.publishMode ? '' : '<div id="loading-badge">Memuat data...</div>'}
+<div id="loading-badge">Memuat data...</div>
 <script>
   window.__app_id = 'preview-app';
   window.__firebase_config = '{}';
-  window.__projectId = ${JSON.stringify(projectId)};
+  window.__projectId = ${JSON.stringify(dataKey)};
+  window.__dataEndpointBase = ${JSON.stringify(dataEndpointBase)};
   window.onerror = function(msg, src, line, col, err){
     var el = document.getElementById('error-overlay');
     el.style.display = 'block';
@@ -725,16 +718,18 @@ document.getElementById('confirmPublishBtn').onclick = async () => {
 
   const code = codeInput.value;
   let html;
+  let initialData = {};
 
   try {
     if (currentType === 'react') {
+      // Ambil data preview terakhir, cuma buat bekal awal kalau ini publish PERTAMA kali.
+      // Kalau slug-nya udah pernah dipublish, data yang sudah hidup di sana gak akan ditimpa.
       const projectId = hashCode(code.trim());
-      let bakedData = {};
       try {
         const res = await fetch('/api/data/' + encodeURIComponent(projectId));
-        if (res.ok) bakedData = await res.json();
-      } catch (e) { /* gapapa, publish dengan data kosong */ }
-      html = buildReactDoc(code, { publishMode: true, bakedData });
+        if (res.ok) initialData = await res.json();
+      } catch (e) { /* gapapa, mulai kosong */ }
+      html = buildReactDoc(code, { dataEndpointBase: '/api/public-data/', dataKey: slug });
     } else {
       html = buildHtmlDoc(code);
     }
@@ -742,7 +737,7 @@ document.getElementById('confirmPublishBtn').onclick = async () => {
     const res = await fetch('/api/publish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, customDomain: domain || null, html, type: currentType })
+      body: JSON.stringify({ slug, customDomain: domain || null, html, type: currentType, initialData })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -752,6 +747,7 @@ document.getElementById('confirmPublishBtn').onclick = async () => {
     const fullUrl = window.location.origin + data.url;
     resultBox.style.display = 'block';
     resultBox.innerHTML = 'Berhasil dipublish!<br><br>Link: <a href="' + fullUrl + '" target="_blank" style="color:#5eead4;">' + fullUrl + '</a>' +
+      '<br><br>Sekarang kalau ada yang edit data di halaman ini (misal ganti foto), <b>beneran kesimpan</b>, gak ilang pas refresh.' +
       (domain ? '<br><br>Custom domain: arahkan DNS domain <b>' + domain + '</b> (record CNAME/A) ke server ini biar aktif.' : '');
   } catch (e) {
     alert('Gagal publish: ' + e.message);

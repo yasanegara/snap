@@ -212,7 +212,7 @@ app.get('/api/publish', requireAuth, (req, res) => {
 });
 
 app.post('/api/publish', requireAuth, async (req, res) => {
-  const { slug, customDomain, html, type } = req.body || {};
+  const { slug, customDomain, html, type, initialData } = req.body || {};
   if (!slug || !SLUG_PATTERN.test(slug)) {
     return res.status(400).json({ error: 'Slug gak valid. Pakai huruf kecil, angka, dan tanda "-" aja, misal: exist-detailing' });
   }
@@ -244,6 +244,14 @@ app.post('/api/publish', requireAuth, async (req, res) => {
   };
   await writeJSON('publishes', all);
 
+  // Data live cuma diisi dari preview kalau ini publish PERTAMA KALI.
+  // Kalau republish, data yang sudah hidup di halaman publik gak ditimpa.
+  if (!existing && initialData) {
+    const publicData = readJSON('publicData');
+    publicData[slug] = initialData;
+    await writeJSON('publicData', publicData);
+  }
+
   res.json({ ok: true, slug, url: '/p/' + slug });
 });
 
@@ -253,6 +261,41 @@ app.delete('/api/publish/:slug', requireAuth, async (req, res) => {
   if (!item || item.orgId !== req.user.orgId) return res.status(404).json({ error: 'tidak ditemukan' });
   delete all[req.params.slug];
   await writeJSON('publishes', all);
+  const publicData = readJSON('publicData');
+  delete publicData[req.params.slug];
+  await writeJSON('publicData', publicData);
+  res.json({ ok: true });
+});
+
+// Reset data live halaman publish (cuma pemilik tim yang boleh)
+app.delete('/api/publish/:slug/data', requireAuth, async (req, res) => {
+  const all = readJSON('publishes');
+  const item = all[req.params.slug];
+  if (!item || item.orgId !== req.user.orgId) return res.status(404).json({ error: 'tidak ditemukan' });
+  const publicData = readJSON('publicData');
+  delete publicData[req.params.slug];
+  await writeJSON('publicData', publicData);
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Data live buat halaman yang SUDAH dipublish — publik (tanpa login), karena
+// yang buka ini adalah pengunjung situs itu sendiri (misal buka panel admin
+// bawaan kode-nya). Tetap dicek slug-nya beneran terdaftar biar gak asal isi.
+// ---------------------------------------------------------------------------
+app.get('/api/public-data/:slug', (req, res) => {
+  const publishes = readJSON('publishes');
+  if (!publishes[req.params.slug]) return res.status(404).json({ error: 'slug tidak ditemukan' });
+  const publicData = readJSON('publicData');
+  res.json(publicData[req.params.slug] || {});
+});
+
+app.post('/api/public-data/:slug', async (req, res) => {
+  const publishes = readJSON('publishes');
+  if (!publishes[req.params.slug]) return res.status(404).json({ error: 'slug tidak ditemukan' });
+  const publicData = readJSON('publicData');
+  publicData[req.params.slug] = req.body || {};
+  await writeJSON('publicData', publicData);
   res.json({ ok: true });
 });
 
