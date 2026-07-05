@@ -145,6 +145,7 @@
     <div class="field">
       <label>Gaya Visual</label>
       <select id="styleSelect">
+        <option value="__AI_CHOOSE__">🤖 Biar AI yang Pilihkan (sesuai jenis bisnis)</option>
         <option value="Glassmorphism / Liquid Glass: semua card dan panel pakai efek kaca buram (backdrop-blur dengan CSS backdrop-filter: blur), transparan dengan border tipis putih semi-transparan (border: 1px solid rgba(255,255,255,0.2)), latar belakang pakai gradient warna lembut biar efek kacanya kelihatan, kesan modern dan premium ala produk Apple terbaru">Glassmorphism (Kaca Buram)</option>
         <option value="Neumorphism / Soft UI: warna monokrom pastel lembut (satu warna dasar doang, misal abu muda atau krem), elemen kelihatan menonjol atau masuk ke background pakai dua bayangan halus (box-shadow terang di satu sisi, gelap di sisi lain), TANPA border tegas dan TANPA warna kontras tinggi, kesan lembut dan elegan">Neumorphism (Soft UI)</option>
         <option value="Neobrutalism: border tebal 3-4px warna hitam pekat di SEMUA elemen (tombol, card, input), warna flat yang berani dan kontras tinggi (jangan pakai gradient sama sekali), tipografi besar dan tebal (font-weight 800-900), efek shadow keras/kotak (box-shadow tanpa blur, misal 4px 4px 0 #000), kesan jujur, berani, gak formal">Neobrutalism (Berani & Tegas)</option>
@@ -157,13 +158,18 @@
     <div class="field">
       <label>Warna Aksen Utama</label>
       <div class="swatches" id="colorSwatches">
-        <div class="swatch active" style="background:#D97706" data-val="gold/amber (#D97706)"></div>
+        <div class="swatch active" data-ai="1" style="background:linear-gradient(135deg,#7C3AED,#D97706,#059669);display:flex;align-items:center;justify-content:center;font-size:16px;" title="Biar AI yang pilih warna">🤖</div>
+        <div class="swatch" style="background:#D97706" data-val="gold/amber (#D97706)"></div>
         <div class="swatch" style="background:#2563EB" data-val="biru (#2563EB)"></div>
         <div class="swatch" style="background:#DC2626" data-val="merah (#DC2626)"></div>
         <div class="swatch" style="background:#059669" data-val="hijau emerald (#059669)"></div>
         <div class="swatch" style="background:#DB2777" data-val="pink (#DB2777)"></div>
         <div class="swatch" style="background:#7C3AED" data-val="ungu (#7C3AED)"></div>
         <div class="swatch" style="background:#111827;border:1px solid #333" data-val="hitam/monokrom (#111827)"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:12px;">
+        <input type="color" id="customColorPicker" value="#D97706" style="width:44px;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);cursor:pointer;padding:2px;" />
+        <input type="text" id="customColorHex" placeholder="atau ketik kode hex, misal #FF5733" style="flex:1;" />
       </div>
     </div>
 
@@ -420,6 +426,28 @@ document.querySelectorAll('.swatch').forEach(sw => {
   });
 });
 
+// Color picker & kotak hex manual: kalau dipakai, otomatis matiin pilihan swatch
+const customColorPicker = document.getElementById('customColorPicker');
+const customColorHex = document.getElementById('customColorHex');
+
+function isValidHex(v){
+  return /^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/.test(v.trim());
+}
+
+customColorPicker.addEventListener('input', () => {
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+  customColorHex.value = customColorPicker.value;
+});
+
+customColorHex.addEventListener('input', () => {
+  if (isValidHex(customColorHex.value)) {
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    customColorPicker.value = customColorHex.value.length === 4
+      ? '#' + [...customColorHex.value.slice(1)].map(c => c + c).join('')
+      : customColorHex.value;
+  }
+});
+
 // Tampilkan/sembunyikan kotak isian nomor & pesan WhatsApp sesuai chip aktif/enggak
 const waChip = document.getElementById('waChip');
 const waFields = document.getElementById('waFields');
@@ -456,9 +484,22 @@ function buildPromptText(){
   const bizType = document.getElementById('bizType').value.trim() || '(isi jenis bisnis)';
   const bizAudience = document.getElementById('bizAudience').value.trim() || '(isi target audiens)';
   const sections = sectionDefs.filter(s => s.active);
-  const style = document.getElementById('styleSelect').value;
+  const styleRaw = document.getElementById('styleSelect').value;
+  const style = styleRaw === '__AI_CHOOSE__'
+    ? 'BEBAS — kamu (AI) yang pilih sendiri gaya visual yang paling cocok buat jenis bisnis dan target audiens di atas (boleh pilih dari: Glassmorphism, Neumorphism, Neobrutalism, Bento Grid, Dark Mode Elegan, atau Modern Minimalis), jelaskan singkat alasan kamu pilih gaya itu sebelum kasih kode'
+    : styleRaw;
+
   const activeColor = document.querySelector('#colorSwatches .active');
-  const color = activeColor ? activeColor.dataset.val : 'gold/amber (#D97706)';
+  let color;
+  if (activeColor && activeColor.dataset.ai === '1') {
+    color = 'BEBAS — kamu (AI) yang pilih sendiri warna aksen yang paling cocok buat jenis bisnis dan gaya visual di atas';
+  } else if (activeColor) {
+    color = activeColor.dataset.val;
+  } else if (isValidHex(document.getElementById('customColorHex').value)) {
+    color = 'custom (' + document.getElementById('customColorHex').value.trim() + ')';
+  } else {
+    color = 'gold/amber (#D97706)';
+  }
   const features = getActiveVals('featureChips').map(f => {
     if (f === 'Tombol kontak WhatsApp mengambang') {
       const num = document.getElementById('waNumber').value.trim() || '(isi nomor WhatsApp)';
