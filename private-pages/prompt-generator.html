@@ -22,6 +22,9 @@
   header h1{ font-size:14px; margin:0; font-weight:600; }
   header a{ color:var(--accent); text-decoration:none; font-size:12.5px; }
   .layout{ display:flex; max-width:1400px; margin:0 auto; min-height:calc(100vh - 53px); }
+  .layout.full-preview{ max-width:100%; }
+  .layout.full-preview .form-pane{ display:none; }
+  .layout.full-preview .result-pane{ max-width:1100px; margin:0 auto; }
   .form-pane, .result-pane{ flex:1; padding:28px; }
   .form-pane{ border-right:1px solid var(--line); }
   h2{ font-size:16px; margin:0 0 4px; }
@@ -113,7 +116,7 @@
   <a href="/app">← Kembali ke tool</a>
 </header>
 
-<div class="layout">
+<div class="layout" id="mainLayout">
   <div class="form-pane">
     <h2>Isi Detail Website</h2>
     <p class="sub">Isi ini, nanti otomatis jadi prompt siap-paste ke Gemini/Claude. Hasil kodenya dijamin langsung nyambung ke fitur simpan-data platform ini.</p>
@@ -179,7 +182,7 @@
       <div class="chip-group" id="featureChips">
         <div class="chip active" id="waChip" data-val="Tombol kontak WhatsApp mengambang">Tombol WhatsApp</div>
         <div class="chip active" data-val="Upload foto lewat panel admin di beberapa bagian (hero, galeri, dll)">Upload Foto Admin</div>
-        <div class="chip" data-val="Peta lokasi (gambar peta statis atau placeholder)">Peta Lokasi</div>
+        <div class="chip" id="mapsChip" data-val="Peta lokasi Google Maps">Peta Lokasi (Google Maps)</div>
         <div class="chip" data-val="Form kontak/konsultasi sederhana">Form Kontak</div>
         <div class="chip" data-val="Animasi scroll ringan (fade-in saat elemen muncul)">Animasi Scroll</div>
       </div>
@@ -192,6 +195,11 @@
           <label style="font-size:11.5px;color:#c7ccd4;display:block;margin-bottom:6px;">Pesan Default (yang otomatis terisi saat tombol diklik)</label>
           <input type="text" id="waMessage" placeholder="Halo, saya ingin bertanya tentang layanan Anda" />
         </div>
+      </div>
+      <div id="mapsFields" style="display:none;margin-top:14px;padding:14px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;">
+        <label style="font-size:11.5px;color:#c7ccd4;display:block;margin-bottom:6px;">Alamat Lengkap (buat nampilin lokasi di Google Maps)</label>
+        <input type="text" id="mapsAddress" placeholder="Contoh: Jl. Malioboro No. 1, Yogyakarta" />
+        <p class="hint" style="margin-top:6px;">Peta beneran (bisa di-zoom/geser), bukan cuma gambar. Diambil otomatis dari alamat ini, gak perlu API key apa pun.</p>
       </div>
     </div>
 
@@ -229,8 +237,11 @@
     <div id="promptOutput"><div class="empty-state">Isi form di kiri, lalu klik "Generate Prompt".</div></div>
 
     <div id="aiResultPane" style="display:none;">
-      <iframe id="aiPreviewFrame" style="width:100%;height:420px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:16px;"></iframe>
-      <p class="hint" style="margin-top:-10px;margin-bottom:16px;">💡 Arahkan mouse ke tiap section di preview, nanti muncul tombol "✨ Edit dengan AI" langsung di situ.</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <button class="btn" id="backToFormBtn">← Ubah Detail Lagi</button>
+        <p class="hint" style="margin:0;">💡 Arahkan mouse ke tiap section di preview, klik "✨ Edit dengan AI" buat ubah bagian itu.</p>
+      </div>
+      <iframe id="aiPreviewFrame" style="width:100%;height:calc(100vh - 260px);min-height:500px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:16px;"></iframe>
 
       <div class="field">
         <label>Simpan sebagai</label>
@@ -418,6 +429,15 @@ function syncWaFields(){
 waChip.addEventListener('click', syncWaFields);
 syncWaFields();
 
+// Tampilkan/sembunyikan kotak alamat Google Maps sesuai chip aktif/enggak
+const mapsChip = document.getElementById('mapsChip');
+const mapsFields = document.getElementById('mapsFields');
+function syncMapsFields(){
+  mapsFields.style.display = mapsChip.classList.contains('active') ? 'block' : 'none';
+}
+mapsChip.addEventListener('click', syncMapsFields);
+syncMapsFields();
+
 // Tampilkan/sembunyikan kotak fallback teks logo sesuai toggle
 const logoToggle = document.getElementById('logoToggle');
 const logoTextRow = document.getElementById('logoTextRow');
@@ -444,6 +464,13 @@ function buildPromptText(){
       const num = document.getElementById('waNumber').value.trim() || '(isi nomor WhatsApp)';
       const msg = document.getElementById('waMessage').value.trim() || 'Halo, saya ingin bertanya tentang layanan Anda';
       return 'Tombol kontak WhatsApp mengambang, mengarah ke nomor ' + num + ' dengan pesan default: "' + msg + '"';
+    }
+    if (f === 'Peta lokasi Google Maps') {
+      const address = document.getElementById('mapsAddress').value.trim() || '(isi alamat lengkap)';
+      return 'Peta Google Maps BENERAN (bisa di-zoom/geser, bukan gambar statis) di section kontak. ' +
+        'Caranya: pakai <iframe> dengan src="https://www.google.com/maps?q=' + encodeURIComponent(address) + '&output=embed" ' +
+        'width="100%" height="100%" style={{border:0}} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen>. ' +
+        'Ini gak butuh API key sama sekali, langsung bisa dipakai. Alamat yang dipakai: "' + address + '".';
     }
     return f;
   });
@@ -718,6 +745,7 @@ async function runGenerate(){
 
     currentGeneratedCode = code;
     setTimeout(() => {
+      document.getElementById('mainLayout').classList.add('full-preview');
       document.getElementById('promptOutput').style.display = 'none';
       document.getElementById('aiResultPane').style.display = 'block';
       document.getElementById('aiPreviewFrame').srcdoc = wrapPreviewWithErrorOverlay(currentGeneratedCode);
@@ -804,6 +832,11 @@ async function runGenerate(){
 
 document.getElementById('generateAiBtn').addEventListener('click', runGenerate);
 document.getElementById('regenerateBtn').addEventListener('click', runGenerate);
+document.getElementById('backToFormBtn').addEventListener('click', () => {
+  document.getElementById('mainLayout').classList.remove('full-preview');
+  document.getElementById('aiResultPane').style.display = 'none';
+  document.getElementById('promptOutput').style.display = 'block';
+});
 
 // ---------- Edit Section pakai AI ----------
 function getPreviewWindow(){
