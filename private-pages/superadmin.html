@@ -40,6 +40,18 @@
     width:100%; max-width:320px; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
     padding:8px 12px; border-radius:8px; font-size:13px; outline:none;
   }
+  .settings-box{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:28px; }
+  .settings-box .field{ margin-bottom:14px; max-width:420px; }
+  .settings-box label{ display:block; font-size:12px; font-weight:600; color:#c7ccd4; margin-bottom:6px; }
+  .settings-box select, .settings-box input[type=text]{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    padding:9px 12px; border-radius:8px; font-size:13px; outline:none;
+  }
+  .settings-box .hint{ font-size:11.5px; color:var(--muted); margin-top:6px; }
+  .btn-save{
+    background:var(--accent); color:#04211d; border:none; padding:9px 18px;
+    border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -52,6 +64,21 @@
 <div class="wrap">
   <div class="cards" id="cards">
     <div class="loading">Memuat data...</div>
+  </div>
+
+  <h2>⚙️ Pengaturan AI</h2>
+  <div class="settings-box" id="settingsBox">
+    <div class="field">
+      <label>Model AI yang dipakai</label>
+      <select id="modelSelect"></select>
+    </div>
+    <div class="field">
+      <label>API Key Anthropic</label>
+      <input type="text" id="apiKeyInput" placeholder="sk-ant-... (kosongkan kalau gak mau ganti)" />
+      <p class="hint" id="apiKeySourceHint"></p>
+    </div>
+    <button class="btn-save" id="saveSettingsBtn">Simpan Pengaturan</button>
+    <span id="saveSettingsStatus" style="margin-left:10px;font-size:12.5px;color:var(--muted);"></span>
   </div>
 
   <h2>Daftar Semua Tim</h2>
@@ -68,11 +95,12 @@
         <th>Halaman</th>
         <th>Publish</th>
         <th>AI Generate</th>
+        <th>Token In/Out</th>
         <th>Terdaftar</th>
       </tr>
     </thead>
     <tbody id="orgTableBody">
-      <tr><td colspan="8" class="loading">Memuat...</td></tr>
+      <tr><td colspan="9" class="loading">Memuat...</td></tr>
     </tbody>
   </table>
 </div>
@@ -105,7 +133,10 @@ function renderCards(s){
     { label: 'Total Workspace', value: s.totalWorkspaces },
     { label: 'Total Halaman', value: s.totalPages },
     { label: 'Total Publish', value: s.totalPublishes },
-    { label: 'Total AI Generate', value: s.totalAiGenerations }
+    { label: 'Total AI Generate', value: s.totalAiGenerations },
+    { label: 'Token Input Terpakai', value: s.totalInputTokens.toLocaleString('id-ID') },
+    { label: 'Token Output Terpakai', value: s.totalOutputTokens.toLocaleString('id-ID') },
+    { label: 'Estimasi Biaya AI', value: '$' + s.estimatedCostUSD.toFixed(3) }
   ];
   document.getElementById('cards').innerHTML = items.map(it =>
     '<div class="card"><div class="num">' + it.value + '</div><div class="label">' + it.label + '</div></div>'
@@ -115,7 +146,7 @@ function renderCards(s){
 function renderTable(orgs){
   const tbody = document.getElementById('orgTableBody');
   if (orgs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="loading">Belum ada tim.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">Belum ada tim.</td></tr>';
     return;
   }
   tbody.innerHTML = orgs.map(o => {
@@ -128,6 +159,7 @@ function renderTable(orgs){
       '<td>' + o.pageCount + '</td>' +
       '<td>' + o.publishCount + '</td>' +
       '<td>' + o.aiGenerationsUsed + '</td>' +
+      '<td>' + Number(o.aiInputTokens).toLocaleString('id-ID') + ' / ' + Number(o.aiOutputTokens).toLocaleString('id-ID') + '</td>' +
       '<td>' + date + '</td>' +
       '</tr>';
   }).join('');
@@ -143,6 +175,45 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 });
 
 loadStats();
+
+// ---------- Pengaturan AI ----------
+async function loadAiSettings(){
+  try {
+    const res = await fetch('/api/superadmin/settings');
+    if (!res.ok) return;
+    const s = await res.json();
+    const modelSelect = document.getElementById('modelSelect');
+    modelSelect.innerHTML = s.availableModels.map(m =>
+      '<option value="' + m + '"' + (m === s.model ? ' selected' : '') + '>' + m + '</option>'
+    ).join('');
+    const sourceText = s.apiKeySource === 'database' ? 'Diatur lewat panel ini' :
+      s.apiKeySource === 'env' ? 'Diatur lewat env var Railway (ANTHROPIC_API_KEY)' : 'Belum diset sama sekali';
+    document.getElementById('apiKeySourceHint').textContent =
+      (s.apiKeyMasked ? 'Key aktif sekarang: ' + s.apiKeyMasked + ' — ' : '') + sourceText;
+  } catch (e) { /* biarin */ }
+}
+loadAiSettings();
+
+document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+  const model = document.getElementById('modelSelect').value;
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
+  const statusEl = document.getElementById('saveSettingsStatus');
+  statusEl.textContent = 'Menyimpan...';
+  try {
+    const res = await fetch('/api/superadmin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, apiKey: apiKey || undefined })
+    });
+    if (!res.ok) throw new Error('Gagal menyimpan');
+    statusEl.textContent = 'Tersimpan ✓';
+    document.getElementById('apiKeyInput').value = '';
+    loadAiSettings();
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+  } catch (e) {
+    statusEl.textContent = 'Gagal: ' + e.message;
+  }
+});
 </script>
 
 </body>

@@ -116,14 +116,12 @@ Di halaman Prompt Generator, sekarang ada tombol **🤖 Generate Otomatis** di s
 
 ### Setup yang dibutuhkan
 
+Sekarang API key dan model AI bisa diatur **langsung dari Panel Superadmin** (lihat bagian di bawah), gak perlu lewat Railway lagi. Tapi kalau mau tetap pakai env var juga bisa:
+
 1. Buat akun di https://console.anthropic.com kalau belum ada
 2. Buka menu **API Keys** → **Create Key**
 3. Copy key-nya (mulai dengan `sk-ant-...`)
-4. Di Railway, buka service aplikasi kamu → tab **Variables** → tambahkan:
-   ```
-   ANTHROPIC_API_KEY=sk-ant-...
-   ```
-5. Redeploy
+4. Masukin lewat **Panel Superadmin → Pengaturan AI** (lebih gampang), ATAU tambahin env var `ANTHROPIC_API_KEY` di Railway
 
 ### Biaya
 
@@ -131,7 +129,7 @@ Ini bukan gratis dari Anthropic — tiap kali generate, server kamu bayar ke Ant
 - **Paket gratis**: 3 kali generate otomatis (total, bukan per bulan)
 - **Paket Pro**: tanpa batas
 
-Kalau mau ganti model AI yang dipakai, tambahkan env var `ANTHROPIC_MODEL` di Railway (defaultnya `claude-sonnet-5`).
+Kamu bisa lihat **total token yang kepake dan estimasi biayanya** langsung di Panel Superadmin.
 
 ## Panel Superadmin (buat kamu, pemilik platform)
 
@@ -151,6 +149,12 @@ Bisa lebih dari satu, pisahkan pakai koma: `email1@gmail.com,email2@gmail.com`
 2. Buka `namadomain.com/superadmin.html`
 
 Kalau login pakai email lain (bukan superadmin), otomatis ditolak/diarahkan balik ke tool biasa.
+
+### Isinya
+
+- Ringkasan angka: total tim, tim Pro, user, workspace, halaman, publish, generate AI, **total token terpakai, dan estimasi biaya AI dalam Dolar**
+- **Pengaturan AI**: ganti model yang dipakai dan atur/ganti API key langsung dari sini (gak perlu buka Railway)
+- Tabel semua tim, bisa dicari pakai nama, lengkap sama pemakaian token per tim
 
 ## Batasan paket Gratis
 

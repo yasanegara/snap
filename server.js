@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');
 const { pool, migrate } = require('./lib/db');
 const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny, requireSuperAdmin, requireSuperAdminPage } = require('./lib/auth');
 const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
-const { generateHtmlFromPrompt, extractCode } = require('./lib/ai');
+const { generateHtmlFromPrompt, extractCode, getSetting, setSetting, getAiConfig, estimateCostUSD, PRICING } = require('./lib/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -388,9 +388,16 @@ app.post('/api/generate', requireAuth, async (req, res) => {
   }
 
   try {
-    const rawText = await generateHtmlFromPrompt(prompt);
+    const { text: rawText, usage } = await generateHtmlFromPrompt(prompt);
     const code = extractCode(rawText);
-    await pool.query('UPDATE orgs SET ai_generations_used = ai_generations_used + 1 WHERE id = $1', [req.user.orgId]);
+    await pool.query(
+      `UPDATE orgs SET
+        ai_generations_used = ai_generations_used + 1,
+        ai_input_tokens_used = ai_input_tokens_used + $2,
+        ai_output_tokens_used = ai_output_tokens_used + $3
+       WHERE id = $1`,
+      [req.user.orgId, usage.inputTokens, usage.outputTokens]
+    );
     res.json({ ok: true, code });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -450,20 +457,22 @@ app.post('/api/billing/webhook', async (req, res) => {
 // Panel Superadmin — buat pemilik platform, ngawasin semua tim
 // ---------------------------------------------------------------------------
 app.get('/api/superadmin/stats', requireAuth, requireSuperAdmin, async (req, res) => {
-  const [orgsCount, proCount, usersCount, wsCount, snippetsCount, publishesCount, aiUsageSum] = await Promise.all([
+  const [orgsCount, proCount, usersCount, wsCount, snippetsCount, publishesCount, aiUsageSum, tokenSum] = await Promise.all([
     pool.query('SELECT COUNT(*)::int AS c FROM orgs'),
     pool.query("SELECT COUNT(*)::int AS c FROM orgs WHERE plan = 'pro' AND subscription_expires_at > $1", [Date.now()]),
     pool.query('SELECT COUNT(*)::int AS c FROM users'),
     pool.query('SELECT COUNT(*)::int AS c FROM workspaces'),
     pool.query('SELECT COUNT(*)::int AS c FROM snippets'),
     pool.query('SELECT COUNT(*)::int AS c FROM publishes'),
-    pool.query('SELECT COALESCE(SUM(ai_generations_used),0)::int AS s FROM orgs')
+    pool.query('SELECT COALESCE(SUM(ai_generations_used),0)::int AS s FROM orgs'),
+    pool.query('SELECT COALESCE(SUM(ai_input_tokens_used),0)::bigint AS i, COALESCE(SUM(ai_output_tokens_used),0)::bigint AS o FROM orgs')
   ]);
 
   const orgList = await pool.query(`
     SELECT
       o.id, o.name, o.plan, o.subscription_expires_at AS "subscriptionExpiresAt", o.created_at AS "createdAt",
       o.ai_generations_used AS "aiGenerationsUsed",
+      o.ai_input_tokens_used AS "aiInputTokens", o.ai_output_tokens_used AS "aiOutputTokens",
       (SELECT COUNT(*)::int FROM users u WHERE u.org_id = o.id) AS "userCount",
       (SELECT COUNT(*)::int FROM workspaces w WHERE w.org_id = o.id) AS "workspaceCount",
       (SELECT COUNT(*)::int FROM snippets s WHERE s.org_id = o.id) AS "pageCount",
@@ -471,6 +480,11 @@ app.get('/api/superadmin/stats', requireAuth, requireSuperAdmin, async (req, res
     FROM orgs o
     ORDER BY o.created_at DESC
   `);
+
+  const { model } = await getAiConfig();
+  const totalInputTokens = Number(tokenSum.rows[0].i);
+  const totalOutputTokens = Number(tokenSum.rows[0].o);
+  const estimatedCostUSD = estimateCostUSD(model, totalInputTokens, totalOutputTokens);
 
   res.json({
     summary: {
@@ -480,13 +494,33 @@ app.get('/api/superadmin/stats', requireAuth, requireSuperAdmin, async (req, res
       totalWorkspaces: wsCount.rows[0].c,
       totalPages: snippetsCount.rows[0].c,
       totalPublishes: publishesCount.rows[0].c,
-      totalAiGenerations: aiUsageSum.rows[0].s
+      totalAiGenerations: aiUsageSum.rows[0].s,
+      totalInputTokens,
+      totalOutputTokens,
+      estimatedCostUSD
     },
     orgs: orgList.rows.map((o) => ({
       ...o,
       plan: (o.plan === 'pro' && o.subscriptionExpiresAt && Number(o.subscriptionExpiresAt) > Date.now()) ? 'pro' : 'free'
     }))
   });
+});
+
+app.get('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { model, apiKey } = await getAiConfig();
+  res.json({
+    model,
+    apiKeyMasked: apiKey ? apiKey.slice(0, 10) + '...' + apiKey.slice(-4) : '',
+    apiKeySource: (await getSetting('ai_api_key', null)) ? 'database' : (process.env.ANTHROPIC_API_KEY ? 'env' : 'belum-diset'),
+    availableModels: Object.keys(PRICING)
+  });
+});
+
+app.post('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { model, apiKey } = req.body || {};
+  if (model) await setSetting('ai_model', model);
+  if (apiKey) await setSetting('ai_api_key', apiKey);
+  res.json({ ok: true });
 });
 
 console.log('Cek DATABASE_URL:', process.env.DATABASE_URL ? 'ADA (' + process.env.DATABASE_URL.replace(/:[^:@]+@/, ':****@') + ')' : 'KOSONG / TIDAK ADA');
