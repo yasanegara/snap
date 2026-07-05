@@ -596,7 +596,12 @@ function buildPromptText(){
 'TAMBAHAN WAJIB: Selain tombol gear, buat juga supaya kalau pengunjung membuka website dengan menambahkan `#admin` di akhir URL (contoh: namadomain.com/#admin), halaman login admin langsung otomatis muncul. Caranya: cek `window.location.hash === "#admin"` di komponen App saat pertama kali render (pakai useEffect), kalau cocok maka langsung set tampilan ke halaman login (bukan ke halaman publik).\n\n' +
 (wantsLogo ? '7. RESPONSIVE\n' : '6. RESPONSIVE\n') +
 'Pastikan tampilan rapi di HP (mobile-first) dan desktop.\n\n' +
-'PENTING BUAT PANJANG KODE: Tulis kode seringkas mungkin TANPA mengurangi fitur. Jangan tulis komentar panjang, jangan ulang-ulang kode yang mirip (gunakan .map() buat list/array daripada nulis manual satu-satu), dan JANGAN buat form admin manual (lihat poin di atas).\n\n' +
+'PENTING BUAT PANJANG KODE (WAJIB DIIKUTI SEMUA, INI SERING BIKIN KODE KEPOTONG):\n' +
+'- Buat IKON pakai emoji Unicode (✨ 📞 📍 ⭐ dll) atau karakter simbol biasa. JANGAN gambar ikon pakai SVG path manual (<svg><path d="..."/></svg>) — itu paling boros kode. Kalau butuh 1-2 ikon SVG yang gak ada emoji-nya, boleh, tapi JANGAN lebih dari 3 SVG total di keseluruhan kode.\n' +
+'- Bikin komponen yang dipakai berulang (misal ImageUploader, Card layanan, item testimoni) SEKALI SAJA, lalu panggil ulang pakai .map() — JANGAN tulis ulang JSX yang mirip berkali-kali.\n' +
+'- Jangan tulis komentar penjelasan panjang di kode, jangan tulis kode yang gak kepake.\n' +
+'- Kalimat/teks konten (judul, deskripsi) boleh singkat dan padat, gak perlu paragraf panjang-panjang.\n' +
+'- JANGAN buat form admin manual (lihat poin sebelumnya).\n\n' +
 'Tolong langsung berikan kode HTML lengkapnya, tanpa penjelasan panjang di luar kode.';
 }
 
@@ -707,6 +712,20 @@ async function loadWorkspacesForSave(){
 }
 
 async function runGenerate(){
+  const activeSectionCount = sectionDefs.filter(s => s.active).length;
+  const activeFeatureCount = document.querySelectorAll('#featureChips .chip.active').length;
+  const complexity = activeSectionCount + activeFeatureCount + (document.getElementById('logoToggle').checked ? 1 : 0);
+
+  if (complexity >= 9) {
+    const lanjut = confirm(
+      'Kombinasi section + fitur yang kamu pilih lumayan banyak (' + activeSectionCount + ' section, ' + activeFeatureCount + ' fitur tambahan). ' +
+      'Ini BERISIKO kepotong karena kodenya jadi sangat panjang.\n\n' +
+      'Saran: kurangi dulu jadi beberapa section inti (misal 4-5), generate, baru nanti tambah section lain satu-satu pakai "Edit Section dengan AI" setelah halamannya jadi.\n\n' +
+      'Tetap mau lanjut generate semuanya sekaligus?'
+    );
+    if (!lanjut) return;
+  }
+
   const btn = document.getElementById('generateAiBtn');
   const prompt = buildPromptText();
   btn.disabled = true;
