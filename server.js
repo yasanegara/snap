@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const cookieParser = require('cookie-parser');
 
 const { pool, migrate } = require('./lib/db');
-const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny } = require('./lib/auth');
+const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny, requireSuperAdmin, requireSuperAdminPage } = require('./lib/auth');
 const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
 const { generateHtmlFromPrompt, extractCode } = require('./lib/ai');
 
@@ -80,6 +80,10 @@ app.get('/app', requireAuthPage, (req, res) => {
 
 app.get('/prompt-generator.html', requireAuthPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'private-pages', 'prompt-generator.html'));
+});
+
+app.get('/superadmin.html', requireAuthPage, requireSuperAdminPage, (req, res) => {
+  res.sendFile(path.join(__dirname, 'private-pages', 'superadmin.html'));
 });
 
 // Halaman publik hasil publish
@@ -440,6 +444,49 @@ app.post('/api/billing/webhook', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Panel Superadmin — buat pemilik platform, ngawasin semua tim
+// ---------------------------------------------------------------------------
+app.get('/api/superadmin/stats', requireAuth, requireSuperAdmin, async (req, res) => {
+  const [orgsCount, proCount, usersCount, wsCount, snippetsCount, publishesCount, aiUsageSum] = await Promise.all([
+    pool.query('SELECT COUNT(*)::int AS c FROM orgs'),
+    pool.query("SELECT COUNT(*)::int AS c FROM orgs WHERE plan = 'pro' AND subscription_expires_at > $1", [Date.now()]),
+    pool.query('SELECT COUNT(*)::int AS c FROM users'),
+    pool.query('SELECT COUNT(*)::int AS c FROM workspaces'),
+    pool.query('SELECT COUNT(*)::int AS c FROM snippets'),
+    pool.query('SELECT COUNT(*)::int AS c FROM publishes'),
+    pool.query('SELECT COALESCE(SUM(ai_generations_used),0)::int AS s FROM orgs')
+  ]);
+
+  const orgList = await pool.query(`
+    SELECT
+      o.id, o.name, o.plan, o.subscription_expires_at AS "subscriptionExpiresAt", o.created_at AS "createdAt",
+      o.ai_generations_used AS "aiGenerationsUsed",
+      (SELECT COUNT(*)::int FROM users u WHERE u.org_id = o.id) AS "userCount",
+      (SELECT COUNT(*)::int FROM workspaces w WHERE w.org_id = o.id) AS "workspaceCount",
+      (SELECT COUNT(*)::int FROM snippets s WHERE s.org_id = o.id) AS "pageCount",
+      (SELECT COUNT(*)::int FROM publishes p WHERE p.org_id = o.id) AS "publishCount"
+    FROM orgs o
+    ORDER BY o.created_at DESC
+  `);
+
+  res.json({
+    summary: {
+      totalOrgs: orgsCount.rows[0].c,
+      totalProOrgs: proCount.rows[0].c,
+      totalUsers: usersCount.rows[0].c,
+      totalWorkspaces: wsCount.rows[0].c,
+      totalPages: snippetsCount.rows[0].c,
+      totalPublishes: publishesCount.rows[0].c,
+      totalAiGenerations: aiUsageSum.rows[0].s
+    },
+    orgs: orgList.rows.map((o) => ({
+      ...o,
+      plan: (o.plan === 'pro' && o.subscriptionExpiresAt && Number(o.subscriptionExpiresAt) > Date.now()) ? 'pro' : 'free'
+    }))
+  });
 });
 
 console.log('Cek DATABASE_URL:', process.env.DATABASE_URL ? 'ADA (' + process.env.DATABASE_URL.replace(/:[^:@]+@/, ':****@') + ')' : 'KOSONG / TIDAK ADA');

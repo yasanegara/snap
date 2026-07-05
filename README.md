@@ -133,6 +133,25 @@ Ini bukan gratis dari Anthropic — tiap kali generate, server kamu bayar ke Ant
 
 Kalau mau ganti model AI yang dipakai, tambahkan env var `ANTHROPIC_MODEL` di Railway (defaultnya `claude-sonnet-5`).
 
+## Panel Superadmin (buat kamu, pemilik platform)
+
+Ada halaman khusus buat ngawasin semua tim yang pakai platform ini — total tim, total user, siapa yang pakai paket Pro, berapa banyak halaman/publish/generate AI yang udah dipakai.
+
+### Cara aktifin
+
+Tambahkan env var di Railway:
+```
+SUPERADMIN_EMAILS=email-kamu@gmail.com
+```
+Bisa lebih dari satu, pisahkan pakai koma: `email1@gmail.com,email2@gmail.com`
+
+### Cara buka
+
+1. Login pakai email yang kamu daftarin di `SUPERADMIN_EMAILS` itu
+2. Buka `namadomain.com/superadmin.html`
+
+Kalau login pakai email lain (bukan superadmin), otomatis ditolak/diarahkan balik ke tool biasa.
+
 ## Batasan paket Gratis
 
 Sekarang cuma dibatasi **jumlah project tersimpan (maksimal 3)**. Kalau mau nambah batasan lain (misal fitur tertentu dikunci), bilang aja, saya tambahin.
