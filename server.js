@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');
 const { pool, migrate } = require('./lib/db');
 const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny, requireSuperAdmin, requireSuperAdminPage } = require('./lib/auth');
 const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
-const { generateHtmlFromPrompt, extractCode, getSetting, setSetting, getAiConfig, estimateCostUSD, PRICING, ANTHROPIC_MODELS } = require('./lib/ai');
+const { generateHtmlFromPrompt, extractCode, stripStrayFences, getSetting, setSetting, getAiConfig, estimateCostUSD, PRICING, ANTHROPIC_MODELS } = require('./lib/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -478,7 +478,14 @@ app.post('/api/generate', requireAuth, async (req, res) => {
 
   try {
     const { text: rawText, usage } = await generateHtmlFromPrompt(prompt);
-    const code = extractCode(rawText);
+    const code = stripStrayFences(extractCode(rawText));
+
+    if (!code || code.length < 20) {
+      return res.status(500).json({
+        error: 'AI mengembalikan hasil yang kosong/gak lengkap. Coba generate ulang, atau coba ganti model AI di Panel Superadmin.'
+      });
+    }
+
     await pool.query(
       `UPDATE orgs SET
         ai_generations_used = ai_generations_used + 1,
