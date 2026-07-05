@@ -559,7 +559,14 @@ function buildPromptText(){
   }).join('\n') : '- (bebas, tentukan sendiri section yang relevan)';
   const featureList = features.length ? features.map(f => '- ' + f).join('\n') : '- (tidak ada fitur tambahan khusus)';
 
-  return 'Kamu berperan sebagai Senior UI/UX Designer yang juga seorang Master Marketing berpengalaman bertahun-tahun membuat website untuk bisnis kecil-menengah yang sukses konversi. Gunakan kemampuan desainmu untuk membuat keputusan matang soal tata letak, warna, tipografi, dan kenyamanan pengguna — sekaligus gunakan insting marketing-mu untuk menyusun copywriting yang persuasif, alur cerita yang membangun kepercayaan, dan call-to-action yang efektif mendorong pengunjung bertindak. Jangan bikin template asal jadi.\n\n' +
+  return 'Kamu berperan sebagai Senior UI/UX Designer yang juga seorang Master Marketing berpengalaman bertahun-tahun membuat website untuk bisnis kecil-menengah yang sukses konversi. Gunakan kemampuan desainmu untuk membuat keputusan matang soal tata letak, warna, tipografi, dan kenyamanan pengguna. Jangan bikin template asal jadi.\n\n' +
+'GAYA COPYWRITING WAJIB PAKAI PENDEKATAN ALEX HORMOZI (biar konversi ke penjualan tinggi):\n' +
+'- Headline HARUS spesifik dan janji hasil yang jelas (bukan kalimat umum). Contoh SALAH: "Layanan Terbaik Untuk Anda". Contoh BENAR: "Mobil Kinclong Kayak Baru dalam 3 Jam, Garansi Uang Kembali Kalau Kamu Kecewa".\n' +
+'- Terapkan konsep "Value Stacking": di section layanan/harga, tonjolkan APA AJA yang didapat (bukan cuma nama layanan doang) — misal bukan cuma "Paket A", tapi "Paket A: dapat X + Y + Z (senilai lebih dari harga aslinya)".\n' +
+'- Kasih alasan kenapa harus PERCAYA sekarang: garansi/jaminan (misal "garansi puas atau uang kembali"), bukti sosial spesifik (testimoni dengan hasil konkret, bukan cuma "bagus banget"), dan angka nyata (misal "sudah dipercaya 500+ pelanggan").\n' +
+'- Kasih alasan kenapa harus bertindak SEKARANG (urgency/scarcity yang jujur, misal "slot terbatas", "harga promo bulan ini") — TAPI jangan mengada-ada/menipu, sesuaikan sama konteks bisnisnya.\n' +
+'- CTA (tombol aksi) harus spesifik dan rendah risiko, bukan cuma "Klik Di Sini". Contoh: "Booking Sekarang, Gratis Konsultasi Dulu" lebih baik dari "Hubungi Kami".\n' +
+'- Fokus ke HASIL AKHIR yang didapat pelanggan (transformasi/manfaat), bukan cuma fitur/spesifikasi teknis.\n\n' +
 'Buatkan saya SATU FILE HTML lengkap (bukan React project terpisah) untuk website bisnis berikut:\n\n' +
 'NAMA BISNIS: ' + bizName + '\n' +
 'JENIS BISNIS: ' + bizType + '\n' +
@@ -580,6 +587,16 @@ function buildPromptText(){
 '- Babel Standalone lewat <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>\n' +
 '- Semua komponen React ditulis di dalam SATU <script type="text/babel"> di akhir <body>\n' +
 '- JANGAN pakai import/export, JANGAN pakai file terpisah, JANGAN pakai Firebase\n\n' +
+'1b. SEO, META TAG, DAN THUMBNAIL (WAJIB ADA DI <head>)\n' +
+'Tambahkan tag-tag berikut di <head>, isinya SESUAI nama bisnis, jenis bisnis, dan target audiens di atas (jangan generic/asal):\n' +
+'- `<title>` yang deskriptif, isinya nama bisnis + jenis layanan (contoh: "Exist Auto Detailing - Detailing Mobil Premium Sleman")\n' +
+'- `<meta name="description" content="...">` — 1 kalimat menarik yang jelasin apa yang ditawarkan (maksimal 160 karakter)\n' +
+'- `<meta property="og:title" content="...">`, `<meta property="og:description" content="...">`, `<meta property="og:type" content="website">` — buat preview kalau link-nya dibagi ke WhatsApp/Facebook/dll\n' +
+'- `<meta property="og:image" content="...">` — WAJIB isi pakai URL foto hero/utama-nya (dipakai sebagai thumbnail pas link dibagikan)\n' +
+'- `<meta name="twitter:card" content="summary_large_image">` buat preview di Twitter/X\n' +
+'- 1 favicon sederhana pakai emoji, caranya: `<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚗</text></svg>">` (ganti emoji 🚗 sesuai jenis bisnisnya)\n' +
+'- `<meta name="viewport" content="width=device-width, initial-scale=1.0">` (biasanya udah ada, pastikan tetep ada)\n' +
+'CATATAN: og:title/og:description/og:image ini isinya teks statis di <head> (bukan dari siteData), soalnya perlu langsung kebaca tanpa nunggu JavaScript jalan.\n\n' +
 '2. MODEL DATA\n' +
 'Semua konten yang bisa diedit (judul, teks, foto, dll) HARUS disimpan dalam SATU object bernama `defaultSiteData`, dengan struktur:\n' +
 '{\n' +
