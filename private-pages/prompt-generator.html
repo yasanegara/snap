@@ -226,6 +226,23 @@
       <button class="btn small" id="copyBtn" style="display:none;">📋 Copy Prompt</button>
     </div>
     <div id="promptOutput"><div class="empty-state">Isi form di kiri, lalu klik "Generate Prompt".</div></div>
+
+    <div id="aiResultPane" style="display:none;">
+      <iframe id="aiPreviewFrame" style="width:100%;height:420px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:16px;"></iframe>
+      <div class="field">
+        <label>Simpan sebagai</label>
+        <input type="text" id="saveNameInput2" placeholder="Nama project, misal: Landing Warung Kopi Senja" />
+      </div>
+      <div class="field">
+        <label>Simpan ke Workspace</label>
+        <select id="saveWorkspaceSelect"></select>
+      </div>
+      <div id="saveResultBox" style="display:none;font-size:12.5px;margin-bottom:12px;padding:9px 12px;border-radius:8px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="regenerateBtn" style="flex:1;">↻ Generate Ulang</button>
+        <button class="btn primary" id="saveToWorkspaceBtn" style="flex:2;">💾 Simpan ke Workspace</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -541,16 +558,52 @@ async function loadAiUsage(){
 }
 loadAiUsage();
 
-document.getElementById('generateAiBtn').addEventListener('click', async () => {
+// ---------- Generate Otomatis (AI langsung bikin kodenya) ----------
+let currentGeneratedCode = '';
+let currentWorkspaces = [];
+
+async function loadAiUsage(){
+  try {
+    const res = await fetch('/api/generate/info');
+    if (!res.ok) return;
+    const info = await res.json();
+    const hint = document.getElementById('aiUsageHint');
+    if (info.plan === 'pro') {
+      hint.textContent = 'Paket Pro — generate otomatis tanpa batas';
+    } else {
+      hint.textContent = 'Sisa generate otomatis gratis: ' + Math.max(0, info.limit - info.used) + ' / ' + info.limit;
+    }
+  } catch (e) { /* biarin, jangan blok halaman */ }
+}
+loadAiUsage();
+
+async function loadWorkspacesForSave(){
+  const select = document.getElementById('saveWorkspaceSelect');
+  try {
+    const res = await fetch('/api/workspaces');
+    if (res.status === 401) { window.location.href = '/login.html'; return; }
+    currentWorkspaces = await res.json();
+    if (currentWorkspaces.length === 0) {
+      select.innerHTML = '<option value="">Belum ada workspace, bikin dulu di tool preview</option>';
+      return;
+    }
+    select.innerHTML = currentWorkspaces.map(w =>
+      '<option value="' + w.id + '">' + w.name + ' (' + w.pageCount + '/3 halaman)</option>'
+    ).join('');
+  } catch (e) {
+    select.innerHTML = '<option value="">Gagal memuat workspace</option>';
+  }
+}
+
+async function runGenerate(){
   const btn = document.getElementById('generateAiBtn');
   const prompt = buildPromptText();
-  const originalText = btn.textContent;
   btn.disabled = true;
   btn.textContent = '⏳ Sedang generate...';
   document.getElementById('resultStatus').textContent = 'Menunggu AI...';
   document.getElementById('copyBtn').style.display = 'none';
+  document.getElementById('aiResultPane').style.display = 'none';
 
-  // ---- Tampilan skeleton + progress biar gak berasa lama nunggunya ----
   const steps = [
     'Membaca kebutuhan bisnis kamu...',
     'Merancang struktur halaman...',
@@ -561,6 +614,7 @@ document.getElementById('generateAiBtn').addEventListener('click', async () => {
   ];
   let stepIndex = 0;
 
+  document.getElementById('promptOutput').style.display = 'block';
   document.getElementById('promptOutput').innerHTML = `
     <div class="ai-loading-box">
       <div class="ai-loading-title">🤖 AI lagi bikin website kamu...</div>
@@ -581,13 +635,11 @@ document.getElementById('generateAiBtn').addEventListener('click', async () => {
   const stepTextEl = document.getElementById('aiStepText');
   const progressFillEl = document.getElementById('aiProgressFill');
 
-  // Ganti pesan tahapan tiap ~6 detik
   const stepTimer = setInterval(() => {
     stepIndex = Math.min(stepIndex + 1, steps.length - 1);
     stepTextEl.textContent = steps[stepIndex];
   }, 6000);
 
-  // Progress bar palsu: jalan pelan-pelan mendekati 90%, gak pernah nyampe 100% sampai beneran selesai
   let progress = 0;
   const progressTimer = setInterval(() => {
     progress += (90 - progress) * 0.06;
@@ -597,6 +649,11 @@ document.getElementById('generateAiBtn').addEventListener('click', async () => {
   function stopLoadingAnim(){
     clearInterval(stepTimer);
     clearInterval(progressTimer);
+  }
+  function resetToEmpty(){
+    document.getElementById('promptOutput').innerHTML = '<div class="empty-state">Isi form di kiri, lalu klik "Generate Prompt".</div>';
+    btn.disabled = false;
+    btn.textContent = '🤖 Generate Otomatis (AI langsung bikin)';
   }
 
   try {
@@ -611,7 +668,7 @@ document.getElementById('generateAiBtn').addEventListener('click', async () => {
 
     if (res.status === 402) {
       stopLoadingAnim();
-      document.getElementById('promptOutput').innerHTML = '<div class="empty-state">Isi form di kiri, lalu klik "Generate Prompt".</div>';
+      resetToEmpty();
       if (confirm((data.error || 'Kuota generate otomatis sudah habis.') + '\n\nBuka halaman upgrade sekarang?')) {
         window.location.href = '/billing.html';
       }
@@ -620,26 +677,73 @@ document.getElementById('generateAiBtn').addEventListener('click', async () => {
 
     if (!res.ok) {
       stopLoadingAnim();
-      document.getElementById('promptOutput').innerHTML = '<div class="empty-state">Isi form di kiri, lalu klik "Generate Prompt".</div>';
+      resetToEmpty();
       alert('Gagal generate.\n\nDetail: ' + (data.error || ('HTTP ' + res.status)));
       return;
     }
 
-    // Sukses: progress lompat ke 100% sebentar biar kerasa "selesai", baru pindah halaman
     stopLoadingAnim();
     progressFillEl.style.width = '100%';
-    stepTextEl.textContent = 'Selesai! Membuka di tool preview...';
+    stepTextEl.textContent = 'Selesai!';
 
-    sessionStorage.setItem('__pendingGeneratedCode', data.code);
-    sessionStorage.setItem('__pendingGeneratedType', 'html');
-    setTimeout(() => { window.location.href = '/app?fromAi=1'; }, 500);
+    // Tampilkan hasilnya di panel preview, JANGAN langsung pindah halaman
+    currentGeneratedCode = data.code;
+    setTimeout(() => {
+      document.getElementById('promptOutput').style.display = 'none';
+      document.getElementById('aiResultPane').style.display = 'block';
+      document.getElementById('aiPreviewFrame').srcdoc = currentGeneratedCode;
+      document.getElementById('saveResultBox').style.display = 'none';
+      const bizName = document.getElementById('bizName').value.trim();
+      document.getElementById('saveNameInput2').value = bizName || 'Project Baru';
+      loadWorkspacesForSave();
+      btn.disabled = false;
+      btn.textContent = '🤖 Generate Otomatis (AI langsung bikin)';
+      document.getElementById('resultStatus').textContent = 'Hasil AI siap direview & disimpan';
+    }, 400);
+
+    loadAiUsage();
   } catch (e) {
     stopLoadingAnim();
-    document.getElementById('promptOutput').innerHTML = '<div class="empty-state">Isi form di kiri, lalu klik "Generate Prompt".</div>';
+    resetToEmpty();
     alert('Gagal generate.\n\nDetail: ' + e.message);
-    btn.disabled = false;
-    btn.textContent = originalText;
     loadAiUsage();
+  }
+}
+
+document.getElementById('generateAiBtn').addEventListener('click', runGenerate);
+document.getElementById('regenerateBtn').addEventListener('click', runGenerate);
+
+document.getElementById('saveToWorkspaceBtn').addEventListener('click', async () => {
+  const name = document.getElementById('saveNameInput2').value.trim() || 'Tanpa nama';
+  const workspaceId = document.getElementById('saveWorkspaceSelect').value;
+  const resultBox = document.getElementById('saveResultBox');
+  if (!workspaceId) { alert('Pilih workspace dulu ya (atau bikin workspace baru di tool preview).'); return; }
+
+  try {
+    const res = await fetch('/api/snippets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, type: 'html', code: currentGeneratedCode, workspaceId })
+    });
+    const data = await res.json();
+
+    if (res.status === 402) {
+      if (confirm((data.error || 'Batas halaman di workspace ini sudah penuh.') + '\n\nBuka halaman upgrade sekarang?')) {
+        window.location.href = '/billing.html';
+      }
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || 'Gagal menyimpan');
+
+    resultBox.style.display = 'block';
+    resultBox.style.background = '#0f2e29';
+    resultBox.style.color = '#a7f3e8';
+    resultBox.innerHTML = 'Tersimpan di workspace ✓ — <a href="/app" style="color:#5eead4;text-decoration:underline;">Buka di tool preview</a> buat lanjut edit.';
+  } catch (e) {
+    resultBox.style.display = 'block';
+    resultBox.style.background = '#2a1010';
+    resultBox.style.color = '#ff9c9c';
+    resultBox.textContent = 'Gagal menyimpan: ' + e.message;
   }
 });
 </script>
