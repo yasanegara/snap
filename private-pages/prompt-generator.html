@@ -231,6 +231,10 @@
     }, 500);
     return () => clearTimeout(timer);
   }, [siteData, dataLoaded]);
+
+  // WAJIB: buka akses baca-tulis siteData buat platform (dipakai fitur "Mode Edit" klik-langsung)
+  window.__getSiteData = () => siteData;
+  window.__setSiteData = setSiteData;
 </script>
 
 <script type="text/plain" id="contractUploader">
@@ -452,6 +456,14 @@ document.getElementById('generateBtn').addEventListener('click', () => {
 '  sections: { hero: { visible: true, title: "...", image: "...", ... }, about: {...}, ... }\n' +
 '}\n' +
 'Setiap section punya field `visible` (boolean) buat sembunyikan/tampilkan.\n\n' +
+'2b. TANDA ELEMEN YANG BISA DIEDIT LANGSUNG (WAJIB)\n' +
+'Setiap elemen JSX yang menampilkan isi dari `siteData` (judul, teks, gambar, dll) WAJIB dikasih atribut `data-edit` berisi path menuju datanya, dan `data-edit-type` sesuai jenisnya ("text" buat judul singkat, "textarea" buat paragraf panjang, "image" buat gambar). Contoh:\n' +
+'```jsx\n' +
+'<h1 data-edit="sections.hero.title" data-edit-type="text">{siteData.sections.hero.title}</h1>\n' +
+'<p data-edit="sections.hero.tagline" data-edit-type="textarea">{siteData.sections.hero.tagline}</p>\n' +
+'<img data-edit="sections.hero.image" data-edit-type="image" src={siteData.sections.hero.image} />\n' +
+'```\n' +
+'Untuk item dalam daftar (misal testimoni, harga), path-nya pakai index array, contoh: `sections.testimonials.items.0.nama`. Atribut ini WAJIB ada di semua elemen konten yang bisa diedit, supaya platform bisa menyediakan mode edit klik-langsung buat pengguna awam.\n\n' +
 '3. KOMPONEN App HARUS PAKAI STATE INI (SALIN PERSIS, JANGAN DIUBAH LOGIKANYA):\n\n' +
 '```jsx\n' + contractHooks + '\n```\n\n' +
 'Taruh kode di atas di paling awal komponen `App`, sebelum logic lainnya. Tampilkan juga indikator kecil di panel admin: tampilkan teks "Menyimpan..." kalau saveStatus === "saving", "Tersimpan ✓" kalau "saved", "Gagal menyimpan" kalau "error".\n\n' +
