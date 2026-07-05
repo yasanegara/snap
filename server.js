@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');
 const { pool, migrate } = require('./lib/db');
 const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny, requireSuperAdmin, requireSuperAdminPage } = require('./lib/auth');
 const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
-const { generateHtmlFromPrompt, generateHtmlFromPromptStream, extractCode, stripStrayFences, getSetting, setSetting, getAiConfig, estimateCostUSD, PRICING, ANTHROPIC_MODELS } = require('./lib/ai');
+const { generateHtmlFromPrompt, generateHtmlFromPromptStream, extractCode, stripStrayFences, extractJSONObject, getSetting, setSetting, getAiConfig, estimateCostUSD, PRICING, ANTHROPIC_MODELS } = require('./lib/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -574,23 +574,23 @@ app.post('/api/edit-section', requireAuth, async (req, res) => {
 
   const editPrompt =
     'Ini data JSON sebuah website (struktur siteData React):\n\n' +
-    '```json\n' + JSON.stringify(currentData, null, 2) + '\n```\n\n' +
+    JSON.stringify(currentData, null, 2) + '\n\n' +
     'Tolong ubah data di atas sesuai instruksi berikut: "' + instruction.trim() + '"\n\n' +
-    'ATURAN WAJIB:\n' +
-    '- Balikin HANYA JSON hasil yang sudah diupdate, jangan ada penjelasan/teks lain di luar JSON.\n' +
+    'ATURAN WAJIB (PENTING BANGET):\n' +
+    '- Balikin CUMA objek JSON mentah hasil yang sudah diupdate. JANGAN pakai pembungkus ```json atau ``` apa pun. JANGAN kasih kalimat pembuka/penutup/penjelasan sama sekali.\n' +
+    '- Jawaban kamu HARUS langsung dimulai dengan tanda { dan langsung diakhiri dengan tanda }.\n' +
     '- JANGAN mengubah struktur/nama field yang sudah ada (jangan tambah/hapus field).\n' +
     '- Field yang gak disebut di instruksi, biarkan nilainya sama persis seperti semula.\n' +
     '- Untuk field gambar (biasanya namanya mengandung kata "image" atau "logo"), JANGAN diubah nilainya sama sekali kecuali diminta secara eksplisit.';
 
   try {
     const { text: rawText, usage } = await generateHtmlFromPrompt(editPrompt);
-    let cleaned = stripStrayFences(extractCode(rawText));
+    const updatedData = extractJSONObject(rawText);
 
-    let updatedData;
-    try {
-      updatedData = JSON.parse(cleaned);
-    } catch (e) {
-      return res.status(500).json({ error: 'AI membalas dengan format yang gak valid. Coba instruksi yang lebih spesifik, atau coba lagi.' });
+    if (updatedData === undefined) {
+      return res.status(500).json({
+        error: 'AI membalas dengan format yang gak valid. Coba instruksi yang lebih spesifik/sederhana, atau coba lagi. (Token gak kepotong buat percobaan yang gagal ini.)'
+      });
     }
 
     const tokensUsed = usage.inputTokens + usage.outputTokens;
