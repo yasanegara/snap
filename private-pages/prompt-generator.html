@@ -609,10 +609,16 @@ function buildPromptText(){
 'Tambahkan field `logo` di dalam `defaultSiteData.design` (jadi `design.logo`, isi awal boleh null/kosong). Tampilkan logo itu di navbar (pojok kiri). Kalau `design.logo` masih kosong, tampilkan teks fallback: "' + (logoFallback || '(nama bisnis)') + '" sebagai gantinya. Logo ini HARUS bisa diupload/diganti lewat panel admin, pakai pola upload yang sama seperti poin 4 di atas (base64 lewat FileReader), disimpan di `design.logo`.\n\n'
 : '') +
 (wantsLogo ? '6. HALAMAN ADMIN (WAJIB SESINGKAT MUNGKIN)\n' : '5. HALAMAN ADMIN (WAJIB SESINGKAT MUNGKIN)\n') +
-'PENTING: platform ini SUDAH PUNYA fitur "klik-langsung buat edit teks/foto" otomatis (gak butuh kode tambahan dari kamu). JADI, panel admin yang kamu buat CUKUP sesederhana ini, JANGAN bikin form input manual satu-satu per field (itu buang-buang kode dan bikin hasil kepotong):\n' +
-'- Cukup buat 1 halaman admin simpel isinya: (a) toggle tampilkan/sembunyikan tiap section (on/off switch), (b) field GANTI PASSWORD (lihat aturan di bawah, INI WAJIB ADA), (c) tombol logout' + (wantsLogo ? ', (d) upload logo' : '') + '.\n' +
-'- JANGAN buat input teks/textarea manual buat tiap judul/deskripsi/harga dll — itu semua nanti diedit langsung dari tampilan publiknya (bukan dari sini), jadi TIDAK PERLU kamu buatkan form-nya.\n' +
+'PENTING: platform ini SUDAH PUNYA fitur "klik-langsung buat edit teks/foto" otomatis (gak butuh kode tambahan dari kamu). Tapi sebagai CADANGAN kalau fitur itu gak jalan, panel admin WAJIB juga punya cara edit manual yang RINGKAS (lihat poin 5a di bawah — JANGAN bikin form input satu-satu per field karena boros kode):\n' +
+'- Panel admin isinya: (a) toggle tampilkan/sembunyikan tiap section, (b) EDITOR CADANGAN per section (lihat poin 5a, WAJIB ADA), (c) field GANTI PASSWORD (lihat aturan di bawah, WAJIB ADA), (d) tombol logout' + (wantsLogo ? ', (e) upload logo' : '') + '.\n' +
 '- Akses admin: tombol kecil/ikon gear yang gak mencolok di navbar.\n\n' +
+'5a. EDITOR CADANGAN PER SECTION (WAJIB, TAPI HARUS RINGKAS)\n' +
+'JANGAN bikin form input teks/textarea manual satu-satu per field (misal input khusus buat "judul", input khusus buat "harga", dst) — itu paling boros kode dan bikin hasil kepotong.\n' +
+'Sebagai gantinya, buat SATU komponen generik (namanya bebas, misal `SectionRawEditor`) yang dipakai ULANG buat semua section lewat `.map()`, isinya:\n' +
+'- Judul section + tombol "Buka/Tutup" (collapse/expand, defaultnya tertutup)\n' +
+'- Kalau dibuka: 1 `<textarea>` besar yang isinya `JSON.stringify(siteData.sections[namaSection], null, 2)` (data section itu dalam bentuk teks JSON mentah)\n' +
+'- 1 tombol "Simpan Perubahan": waktu diklik, `JSON.parse()` isi textarea itu, kalau berhasil update `siteData.sections[namaSection]` pakai `setSiteData`; kalau `JSON.parse` gagal (teksnya rusak), tampilkan pesan error singkat, JANGAN gagal total/crash.\n' +
+'Ini cara paling ringkas buat kasih akses edit ke SEMUA section tanpa perlu bikin form beda-beda per section.\n\n' +
 '5b. LOGIN & GANTI PASSWORD (WAJIB, JANGAN DI-HARDCODE)\n' +
 'Username dan password admin JANGAN ditulis langsung di kode (jangan hardcode). Sebagai gantinya:\n' +
 '- Tambahkan field `adminUsername` dan `adminPassword` di dalam `defaultSiteData.design`, isi awalnya: `adminUsername: "' + adminUsername + '"`, `adminPassword: "' + adminPassword + '"`.\n' +
