@@ -156,6 +156,18 @@
     </div>
 
     <div class="field">
+      <label>Layout / Susunan Halaman</label>
+      <select id="layoutSelect">
+        <option value="__AI_CHOOSE__">🤖 Biar AI yang Pilihkan (sesuai jenis bisnis)</option>
+        <option value="Vertikal Klasik: section disusun berurutan dari atas ke bawah, tiap section full-width (selebar layar), konten di tengah dengan max-width terbatas. Ini layout paling standar dan aman.">Vertikal Klasik (Standar)</option>
+        <option value="Split Zig-Zag: tiap section (kecuali hero) dipecah jadi 2 kolom sejajar (gambar di satu sisi, teks di sisi lain), posisinya BERGANTIAN kiri-kanan tiap section berikutnya (section 1: gambar kiri teks kanan, section 2: teks kiri gambar kanan, dst) biar gak monoton. Di HP otomatis jadi 1 kolom (gambar di atas, teks di bawah).">Split Zig-Zag (Gambar-Teks Bergantian)</option>
+        <option value="Sidebar Navigasi: menu navigasi ditaruh di SAMPING KIRI sebagai sidebar tetap (fixed/sticky), bukan navbar horizontal di atas. Konten section-section di sebelah kanannya, discroll normal. Mirip tampilan dashboard aplikasi modern. Di HP, sidebar berubah jadi menu hamburger biasa.">Sidebar Navigasi (Gaya Dashboard)</option>
+        <option value="Majalah/Editorial: layout asimetris kayak majalah — kombinasi blok teks besar, gambar dengan ukuran gak seragam, ada elemen yang sengaja overlap/tumpang tindih dikit (misal judul menjorok ke atas gambar), tipografi besar jadi elemen visual utama, grid gak simetris.">Majalah/Editorial (Asimetris)</option>
+        <option value="Layar Penuh per Section (Snap Scroll): tiap section memenuhi TINGGI LAYAR PENUH (min-height: 100vh), pakai CSS scroll-snap (scroll-snap-type: y mandatory di container, scroll-snap-align: start di tiap section) biar pas discroll berasa kayak pindah 'slide' satu-satu. Visual besar dan bold di tiap section, teks singkat dan padat.">Layar Penuh per Section (Snap Scroll)</option>
+      </select>
+    </div>
+
+    <div class="field">
       <label>Warna Aksen Utama</label>
       <div class="swatches" id="colorSwatches">
         <div class="swatch active" data-ai="1" style="background:linear-gradient(135deg,#7C3AED,#D97706,#059669);display:flex;align-items:center;justify-content:center;font-size:16px;" title="Biar AI yang pilih warna">🤖</div>
@@ -489,6 +501,11 @@ function buildPromptText(){
     ? 'BEBAS — kamu (AI) yang pilih sendiri gaya visual yang paling cocok buat jenis bisnis dan target audiens di atas (boleh pilih dari: Glassmorphism, Neumorphism, Neobrutalism, Bento Grid, Dark Mode Elegan, atau Modern Minimalis), jelaskan singkat alasan kamu pilih gaya itu sebelum kasih kode'
     : styleRaw;
 
+  const layoutRaw = document.getElementById('layoutSelect').value;
+  const layout = layoutRaw === '__AI_CHOOSE__'
+    ? 'BEBAS — kamu (AI) yang pilih sendiri layout yang paling cocok buat jenis bisnis dan gaya visual di atas (boleh pilih dari: Vertikal Klasik, Split Zig-Zag, Sidebar Navigasi, Majalah/Editorial, atau Layar Penuh per Section), jelaskan singkat alasan kamu pilih layout itu sebelum kasih kode'
+    : layoutRaw;
+
   const activeColor = document.querySelector('#colorSwatches .active');
   let color;
   if (activeColor && activeColor.dataset.ai === '1') {
@@ -550,6 +567,7 @@ function buildPromptText(){
 'BAHASA KONTEN: ' + lang + '\n\n' +
 'SECTION YANG HARUS ADA:\n' + sectionList + '\n\n' +
 'GAYA VISUAL: ' + style + '\n' +
+'LAYOUT/SUSUNAN HALAMAN: ' + layout + '\n' +
 'WARNA AKSEN UTAMA: ' + color + '\n\n' +
 'FITUR TAMBAHAN:\n' + featureList + '\n\n' +
 '=====================================================\n' +
