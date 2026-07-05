@@ -578,6 +578,8 @@ function buildPromptText(){
 '<img data-edit="sections.hero.image" data-edit-type="image" src={siteData.sections.hero.image} />\n' +
 '```\n' +
 'Untuk item dalam daftar (misal testimoni, harga), path-nya pakai index array, contoh: `sections.testimonials.items.0.nama`. Atribut ini WAJIB ada di semua elemen konten yang bisa diedit, supaya platform bisa menyediakan mode edit klik-langsung buat pengguna awam.\n\n' +
+'2c. ID SECTION (WAJIB, PENTING BANGET)\n' +
+'Setiap elemen <section> (atau pembungkus utama tiap section) WAJIB dikasih atribut `id` yang SAMA PERSIS dengan namanya di `sectionOrder`. Contoh: kalau di sectionOrder ada "hero", maka wajib ada `<section id="hero">...</section>`. Ini WAJIB ada di SEMUA section tanpa kecuali (termasuk hero, about, contact, dll), soalnya platform butuh ini buat nyediain tombol "Edit dengan AI" otomatis di tiap section. Kalau id-nya beda/gak ada, tombol itu gak akan muncul.\n\n' +
 '3. KOMPONEN App HARUS PAKAI STATE INI (SALIN PERSIS, JANGAN DIUBAH LOGIKANYA):\n\n' +
 '```jsx\n' + contractHooks + '\n```\n\n' +
 'Taruh kode di atas di paling awal komponen `App`, sebelum logic lainnya. Tampilkan juga indikator kecil di panel admin: tampilkan teks "Menyimpan..." kalau saveStatus === "saving", "Tersimpan ✓" kalau "saved", "Gagal menyimpan" kalau "error".\n\n' +
@@ -590,10 +592,17 @@ function buildPromptText(){
 : '') +
 (wantsLogo ? '6. HALAMAN ADMIN (WAJIB SESINGKAT MUNGKIN)\n' : '5. HALAMAN ADMIN (WAJIB SESINGKAT MUNGKIN)\n') +
 'PENTING: platform ini SUDAH PUNYA fitur "klik-langsung buat edit teks/foto" otomatis (gak butuh kode tambahan dari kamu). JADI, panel admin yang kamu buat CUKUP sesederhana ini, JANGAN bikin form input manual satu-satu per field (itu buang-buang kode dan bikin hasil kepotong):\n' +
-'- Cukup buat 1 halaman admin simpel isinya: (a) toggle tampilkan/sembunyikan tiap section (on/off switch), (b) tombol logout' + (wantsLogo ? ', (c) upload logo' : '') + '.\n' +
+'- Cukup buat 1 halaman admin simpel isinya: (a) toggle tampilkan/sembunyikan tiap section (on/off switch), (b) field GANTI PASSWORD (lihat aturan di bawah, INI WAJIB ADA), (c) tombol logout' + (wantsLogo ? ', (d) upload logo' : '') + '.\n' +
 '- JANGAN buat input teks/textarea manual buat tiap judul/deskripsi/harga dll — itu semua nanti diedit langsung dari tampilan publiknya (bukan dari sini), jadi TIDAK PERLU kamu buatkan form-nya.\n' +
-'- Akses admin: tombol kecil/ikon gear yang gak mencolok di navbar. Login pakai username "' + adminUsername + '" dan password "' + adminPassword + '" (dicek langsung di kode, gak perlu backend khusus).\n\n' +
-'TAMBAHAN WAJIB: Selain tombol gear, buat juga supaya kalau pengunjung membuka website dengan menambahkan `#admin` di akhir URL (contoh: namadomain.com/#admin), halaman login admin langsung otomatis muncul. Caranya: cek `window.location.hash === "#admin"` di komponen App saat pertama kali render (pakai useEffect), kalau cocok maka langsung set tampilan ke halaman login (bukan ke halaman publik).\n\n' +
+'- Akses admin: tombol kecil/ikon gear yang gak mencolok di navbar.\n\n' +
+'5b. LOGIN & GANTI PASSWORD (WAJIB, JANGAN DI-HARDCODE)\n' +
+'Username dan password admin JANGAN ditulis langsung di kode (jangan hardcode). Sebagai gantinya:\n' +
+'- Tambahkan field `adminUsername` dan `adminPassword` di dalam `defaultSiteData.design`, isi awalnya: `adminUsername: "' + adminUsername + '"`, `adminPassword: "' + adminPassword + '"`.\n' +
+'- Waktu user login, cocokkan input dengan `siteData.design.adminUsername` dan `siteData.design.adminPassword` (bukan string yang ditulis manual di kode).\n' +
+'- Di panel admin, WAJIB ada bagian kecil "Ganti Password": 1 input buat password baru, 1 tombol "Simpan Password Baru". Kalau diklik, update `design.adminPassword` pakai `setSiteData` (otomatis kesimpen sendiri, gak perlu backend tambahan).\n' +
+'- PENTING: karena data baru kebaca setelah `dataLoaded` jadi true, tampilkan halaman login HANYA setelah `dataLoaded === true` (kalau belum, tampilkan tulisan "Memuat..." dulu), biar gak salah cek password lama.\n\n' +
+(wantsLogo ? '6b. ' : '5c. ') + 'AKSES LEWAT #admin\n' +
+'Selain tombol gear, buat juga supaya kalau pengunjung membuka website dengan menambahkan `#admin` di akhir URL (contoh: namadomain.com/#admin), halaman login admin langsung otomatis muncul. Caranya: cek `window.location.hash === "#admin"` di komponen App saat pertama kali render (pakai useEffect), kalau cocok maka langsung set tampilan ke halaman login (bukan ke halaman publik).\n\n' +
 (wantsLogo ? '7. RESPONSIVE\n' : '6. RESPONSIVE\n') +
 'Pastikan tampilan rapi di HP (mobile-first) dan desktop.\n\n' +
 'PENTING BUAT PANJANG KODE (WAJIB DIIKUTI SEMUA, INI SERING BIKIN KODE KEPOTONG):\n' +
