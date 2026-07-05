@@ -203,7 +203,12 @@
 
 <div class="layout">
   <aside class="sidebar">
-    <h2>Riwayat</h2>
+    <div style="padding:12px 14px 8px;border-bottom:1px solid var(--line);">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;">Workspace</div>
+      <select id="workspaceSelect" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:7px 8px;border-radius:7px;font-size:12.5px;margin-bottom:8px;"></select>
+      <button class="btn" id="newWorkspaceBtn" style="width:100%;padding:6px;font-size:12px;">+ Workspace Baru</button>
+    </div>
+    <h2>Halaman di Workspace Ini</h2>
     <div class="history-list" id="historyList">
       <div class="empty-hint">Belum ada yang disimpan. Klik "Simpan" setelah run untuk menyimpan kode ke riwayat.</div>
     </div>
@@ -264,11 +269,23 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="workspaceModal">
+  <div class="modal">
+    <h3>Bikin Workspace Baru</h3>
+    <input type="text" id="workspaceNameInput" placeholder="Nama workspace, misal: Klien Bengkel Sleman" />
+    <div class="row">
+      <button class="btn" id="cancelWorkspaceBtn">Batal</button>
+      <button class="btn primary" id="confirmWorkspaceBtn">Buat</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let currentType = 'react';
 const codeInput = document.getElementById('codeInput');
 const statusBar = document.getElementById('statusBar');
 const previewFrame = document.getElementById('previewFrame');
+const historyList = document.getElementById('historyList');
 
 // ---------- Info akun & paket ----------
 async function loadMe(){
@@ -281,6 +298,74 @@ async function loadMe(){
   } catch (e) { /* biarkan, jangan blok UI */ }
 }
 loadMe();
+
+// ---------- Workspace ----------
+let currentWorkspaceId = null;
+const workspaceSelect = document.getElementById('workspaceSelect');
+
+async function loadWorkspaces(selectId){
+  try {
+    const res = await fetch('/api/workspaces');
+    if (res.status === 401) { window.location.href = '/login.html'; return; }
+    const list = await res.json();
+    workspaceSelect.innerHTML = '';
+    if (list.length === 0) {
+      workspaceSelect.innerHTML = '<option value="">Belum ada workspace</option>';
+      currentWorkspaceId = null;
+      historyList.innerHTML = '<div class="empty-hint">Bikin workspace dulu buat mulai nyimpen halaman.</div>';
+      return;
+    }
+    list.forEach(ws => {
+      const opt = document.createElement('option');
+      opt.value = ws.id;
+      opt.textContent = ws.name + ' (' + ws.pageCount + '/3 halaman)';
+      workspaceSelect.appendChild(opt);
+    });
+    currentWorkspaceId = selectId && list.find(w => w.id === selectId) ? selectId : list[0].id;
+    workspaceSelect.value = currentWorkspaceId;
+    loadHistory();
+  } catch (e) {
+    historyList.innerHTML = '<div class="empty-hint">Gagal memuat workspace.</div>';
+  }
+}
+loadWorkspaces();
+
+workspaceSelect.addEventListener('change', () => {
+  currentWorkspaceId = workspaceSelect.value;
+  loadHistory();
+});
+
+document.getElementById('newWorkspaceBtn').onclick = () => {
+  document.getElementById('workspaceNameInput').value = '';
+  document.getElementById('workspaceModal').classList.add('show');
+};
+document.getElementById('cancelWorkspaceBtn').onclick = () => {
+  document.getElementById('workspaceModal').classList.remove('show');
+};
+document.getElementById('confirmWorkspaceBtn').onclick = async () => {
+  const name = document.getElementById('workspaceNameInput').value.trim();
+  if (!name) { alert('Isi nama workspace dulu ya.'); return; }
+  try {
+    const res = await fetch('/api/workspaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    if (res.status === 402) {
+      document.getElementById('workspaceModal').classList.remove('show');
+      if (confirm((data.error || 'Paket gratis sudah penuh.') + '\n\nBuka halaman upgrade sekarang?')) {
+        window.location.href = '/billing.html';
+      }
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || 'Gagal membuat workspace');
+    document.getElementById('workspaceModal').classList.remove('show');
+    await loadWorkspaces(data.id);
+  } catch (e) {
+    alert('Gagal membuat workspace.\n\nDetail: ' + e.message);
+  }
+};
 
 document.getElementById('logoutBtn').onclick = async () => {
   await fetch('/api/auth/logout', { method: 'POST' });
@@ -769,7 +854,7 @@ document.getElementById('confirmPublishBtn').onclick = async () => {
     const res = await fetch('/api/publish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, customDomain: domain || null, html, type: currentType, initialData })
+      body: JSON.stringify({ slug, customDomain: domain || null, html, type: currentType, initialData, workspaceId: currentWorkspaceId })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -787,7 +872,6 @@ document.getElementById('confirmPublishBtn').onclick = async () => {
 };
 
 // ---------- Riwayat (disimpan di server, dibagi ke semua orang di tim) ----------
-const historyList = document.getElementById('historyList');
 const saveModal = document.getElementById('saveModal');
 const saveNameInput = document.getElementById('saveNameInput');
 
@@ -799,12 +883,13 @@ document.getElementById('saveBtn').onclick = () => {
 };
 document.getElementById('cancelSaveBtn').onclick = () => saveModal.classList.remove('show');
 document.getElementById('confirmSaveBtn').onclick = async () => {
+  if (!currentWorkspaceId) { alert('Bikin/pilih workspace dulu ya, di sidebar kiri.'); return; }
   const name = saveNameInput.value.trim() || ('Tanpa nama - ' + new Date().toLocaleString('id-ID'));
   try {
     const res = await fetch('/api/snippets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, type: currentType, code: codeInput.value })
+      body: JSON.stringify({ name, type: currentType, code: codeInput.value, workspaceId: currentWorkspaceId })
     });
     if (res.status === 401) {
       alert('Sesi login kamu sudah habis. Silakan login lagi.');
@@ -825,6 +910,7 @@ document.getElementById('confirmSaveBtn').onclick = async () => {
       throw new Error(detail);
     }
     saveModal.classList.remove('show');
+    loadWorkspaces(currentWorkspaceId);
     loadHistory();
   } catch (e) {
     alert('Gagal menyimpan.\n\nDetail: ' + e.message);
@@ -835,8 +921,12 @@ saveNameInput.addEventListener('keydown', (e) => {
 });
 
 async function loadHistory(){
+  if (!currentWorkspaceId) {
+    historyList.innerHTML = '<div class="empty-hint">Bikin/pilih workspace dulu buat mulai nyimpen halaman.</div>';
+    return;
+  }
   try {
-    const res = await fetch('/api/snippets');
+    const res = await fetch('/api/snippets?workspaceId=' + encodeURIComponent(currentWorkspaceId));
     if (!res.ok) throw new Error('gagal ambil data');
     const items = await res.json();
     if (!items || items.length === 0) {

@@ -11,7 +11,8 @@ const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const FREE_SNIPPET_LIMIT = 3;
+const FREE_WORKSPACE_LIMIT = 3;
+const FREE_PAGES_PER_WORKSPACE_LIMIT = 3;
 
 app.use(express.json({ limit: '15mb' }));
 app.use(cookieParser());
@@ -145,32 +146,80 @@ app.get('/api/me', requireAuth, async (req, res) => {
       plan: isOrgPro(org) ? 'pro' : 'free',
       subscriptionExpiresAt: org.subscription_expires_at
     } : null,
-    freeSnippetLimit: FREE_SNIPPET_LIMIT
+    freeWorkspaceLimit: FREE_WORKSPACE_LIMIT,
+    freePagesPerWorkspaceLimit: FREE_PAGES_PER_WORKSPACE_LIMIT
   });
 });
 
 // ---------------------------------------------------------------------------
-// Snippets (riwayat kode) — dipisah per tim (orgId)
+// Workspace — tiap tim bisa punya beberapa workspace, tiap workspace isinya halaman-halaman
 // ---------------------------------------------------------------------------
-app.get('/api/snippets', requireAuth, async (req, res) => {
+app.get('/api/workspaces', requireAuth, async (req, res) => {
   const r = await pool.query(
-    'SELECT id, name, type, code, saved_at AS "savedAt" FROM snippets WHERE org_id = $1 ORDER BY saved_at DESC',
+    `SELECT w.id, w.name, w.created_at AS "createdAt", COUNT(s.id)::int AS "pageCount"
+     FROM workspaces w LEFT JOIN snippets s ON s.workspace_id = w.id
+     WHERE w.org_id = $1 GROUP BY w.id ORDER BY w.created_at ASC`,
     [req.user.orgId]
   );
   res.json(r.rows);
 });
 
-app.post('/api/snippets', requireAuth, async (req, res) => {
-  const { name, type, code } = req.body || {};
-  if (!code) return res.status(400).json({ error: 'code wajib diisi' });
+app.post('/api/workspaces', requireAuth, async (req, res) => {
+  const { name } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Nama workspace wajib diisi' });
 
   const org = await getOrg(req.user.orgId);
-  const countRes = await pool.query('SELECT COUNT(*)::int AS c FROM snippets WHERE org_id = $1', [req.user.orgId]);
+  const countRes = await pool.query('SELECT COUNT(*)::int AS c FROM workspaces WHERE org_id = $1', [req.user.orgId]);
+  if (!isOrgPro(org) && countRes.rows[0].c >= FREE_WORKSPACE_LIMIT) {
+    return res.status(402).json({
+      error: 'Paket gratis cuma bisa bikin ' + FREE_WORKSPACE_LIMIT + ' workspace. Upgrade ke Pro buat bikin lebih banyak.',
+      upgradeRequired: true
+    });
+  }
+
+  const id = genId('ws');
+  const createdAt = Date.now();
+  await pool.query(
+    'INSERT INTO workspaces (id, org_id, name, created_at) VALUES ($1,$2,$3,$4)',
+    [id, req.user.orgId, name.trim(), createdAt]
+  );
+  res.json({ id, name: name.trim(), createdAt, pageCount: 0 });
+});
+
+app.delete('/api/workspaces/:id', requireAuth, async (req, res) => {
+  const r = await pool.query('DELETE FROM workspaces WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
+  if (r.rowCount === 0) return res.status(404).json({ error: 'tidak ditemukan' });
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Snippets (halaman web) — dipisah per tim & per workspace
+// ---------------------------------------------------------------------------
+app.get('/api/snippets', requireAuth, async (req, res) => {
+  const { workspaceId } = req.query;
+  if (!workspaceId) return res.status(400).json({ error: 'workspaceId wajib diisi' });
+  const r = await pool.query(
+    'SELECT id, name, type, code, saved_at AS "savedAt" FROM snippets WHERE org_id = $1 AND workspace_id = $2 ORDER BY saved_at DESC',
+    [req.user.orgId, workspaceId]
+  );
+  res.json(r.rows);
+});
+
+app.post('/api/snippets', requireAuth, async (req, res) => {
+  const { name, type, code, workspaceId } = req.body || {};
+  if (!code) return res.status(400).json({ error: 'code wajib diisi' });
+  if (!workspaceId) return res.status(400).json({ error: 'Pilih workspace dulu sebelum menyimpan' });
+
+  const wsCheck = await pool.query('SELECT id FROM workspaces WHERE id = $1 AND org_id = $2', [workspaceId, req.user.orgId]);
+  if (!wsCheck.rows[0]) return res.status(404).json({ error: 'Workspace tidak ditemukan' });
+
+  const org = await getOrg(req.user.orgId);
+  const countRes = await pool.query('SELECT COUNT(*)::int AS c FROM snippets WHERE workspace_id = $1', [workspaceId]);
   const currentCount = countRes.rows[0].c;
 
-  if (!isOrgPro(org) && currentCount >= FREE_SNIPPET_LIMIT) {
+  if (!isOrgPro(org) && currentCount >= FREE_PAGES_PER_WORKSPACE_LIMIT) {
     return res.status(402).json({
-      error: 'Paket gratis cuma bisa nyimpen ' + FREE_SNIPPET_LIMIT + ' project. Upgrade ke Pro buat nyimpen lebih banyak.',
+      error: 'Paket gratis cuma bisa nyimpen ' + FREE_PAGES_PER_WORKSPACE_LIMIT + ' halaman per workspace. Upgrade ke Pro buat nyimpen lebih banyak, atau bikin workspace baru.',
       upgradeRequired: true
     });
   }
@@ -178,10 +227,10 @@ app.post('/api/snippets', requireAuth, async (req, res) => {
   const id = genId('snip');
   const savedAt = Date.now();
   await pool.query(
-    'INSERT INTO snippets (id, org_id, name, type, code, saved_at) VALUES ($1,$2,$3,$4,$5,$6)',
-    [id, req.user.orgId, name || 'Tanpa nama', type || 'react', code, savedAt]
+    'INSERT INTO snippets (id, org_id, workspace_id, name, type, code, saved_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+    [id, req.user.orgId, workspaceId, name || 'Tanpa nama', type || 'react', code, savedAt]
   );
-  res.json({ id, orgId: req.user.orgId, name: name || 'Tanpa nama', type: type || 'react', code, savedAt });
+  res.json({ id, orgId: req.user.orgId, workspaceId, name: name || 'Tanpa nama', type: type || 'react', code, savedAt });
 });
 
 app.delete('/api/snippets/:id', requireAuth, async (req, res) => {
@@ -221,15 +270,19 @@ app.delete('/api/data/:projectId', requireAuth, async (req, res) => {
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 app.get('/api/publish', requireAuth, async (req, res) => {
+  const { workspaceId } = req.query;
+  const params = [req.user.orgId];
+  let where = 'org_id = $1';
+  if (workspaceId) { params.push(workspaceId); where += ' AND workspace_id = $2'; }
   const r = await pool.query(
-    'SELECT slug, custom_domain AS "customDomain", type, updated_at AS "updatedAt" FROM publishes WHERE org_id = $1 ORDER BY updated_at DESC',
-    [req.user.orgId]
+    `SELECT slug, custom_domain AS "customDomain", type, updated_at AS "updatedAt" FROM publishes WHERE ${where} ORDER BY updated_at DESC`,
+    params
   );
   res.json(r.rows);
 });
 
 app.post('/api/publish', requireAuth, async (req, res) => {
-  const { slug, customDomain, html, type, initialData } = req.body || {};
+  const { slug, customDomain, html, type, initialData, workspaceId } = req.body || {};
   if (!slug || !SLUG_PATTERN.test(slug)) {
     return res.status(400).json({ error: 'Slug gak valid. Pakai huruf kecil, angka, dan tanda "-" aja, misal: exist-detailing' });
   }
@@ -253,10 +306,10 @@ app.post('/api/publish', requireAuth, async (req, res) => {
 
   const now = Date.now();
   await pool.query(
-    `INSERT INTO publishes (slug, org_id, custom_domain, html, type, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
-     ON CONFLICT (slug) DO UPDATE SET custom_domain = $3, html = $4, type = $5, updated_at = $7`,
-    [slug, req.user.orgId, customDomain || null, html, type || 'react', existing ? existing.created_at : now, now]
+    `INSERT INTO publishes (slug, org_id, workspace_id, custom_domain, html, type, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     ON CONFLICT (slug) DO UPDATE SET custom_domain = $4, html = $5, type = $6, updated_at = $8`,
+    [slug, req.user.orgId, workspaceId || null, customDomain || null, html, type || 'react', existing ? existing.created_at : now, now]
   );
 
   if (!existing && initialData) {

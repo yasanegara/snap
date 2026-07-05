@@ -403,7 +403,8 @@ document.getElementById('generateBtn').addEventListener('click', () => {
   }).join('\n') : '- (bebas, tentukan sendiri section yang relevan)';
   const featureList = features.length ? features.map(f => '- ' + f).join('\n') : '- (tidak ada fitur tambahan khusus)';
 
-  const prompt = 'Buatkan saya SATU FILE HTML lengkap (bukan React project terpisah) untuk website bisnis berikut:\n\n' +
+  const prompt = 'Kamu berperan sebagai Senior UI/UX Designer yang juga seorang Master Marketing berpengalaman bertahun-tahun membuat website untuk bisnis kecil-menengah yang sukses konversi. Gunakan kemampuan desainmu untuk membuat keputusan matang soal tata letak, warna, tipografi, dan kenyamanan pengguna — sekaligus gunakan insting marketing-mu untuk menyusun copywriting yang persuasif, alur cerita yang membangun kepercayaan, dan call-to-action yang efektif mendorong pengunjung bertindak. Jangan bikin template asal jadi.\n\n' +
+'Buatkan saya SATU FILE HTML lengkap (bukan React project terpisah) untuk website bisnis berikut:\n\n' +
 'NAMA BISNIS: ' + bizName + '\n' +
 'JENIS BISNIS: ' + bizType + '\n' +
 'TARGET AUDIENS: ' + bizAudience + '\n' +
