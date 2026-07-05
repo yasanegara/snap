@@ -562,6 +562,35 @@ loadAiUsage();
 let currentGeneratedCode = '';
 let currentWorkspaces = [];
 
+// Nyuntik penangkap error ke kode hasil AI, biar kalau kodenya rusak/kepotong,
+// muncul kotak error jelas di preview — bukan cuma blank putih diem-diem.
+function wrapPreviewWithErrorOverlay(code){
+  const overlayScript = `
+<script>
+  window.__errorOverlayShown = false;
+  function __showPreviewError(msg){
+    if (window.__errorOverlayShown) return;
+    window.__errorOverlayShown = true;
+    var el = document.createElement('div');
+    el.style.cssText = 'position:fixed;inset:0;background:#1a0000;color:#ff9c9c;font-family:ui-monospace,monospace;font-size:13px;padding:24px;white-space:pre-wrap;overflow:auto;z-index:999999;line-height:1.6;';
+    el.textContent = 'Preview gagal ditampilkan:\\n\\n' + msg + '\\n\\n(Kemungkinan kode dari AI kepotong/rusak. Coba klik "Generate Ulang".)';
+    document.body ? document.body.appendChild(el) : window.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(el); });
+  }
+  window.onerror = function(msg){ __showPreviewError(String(msg)); return true; };
+  window.addEventListener('unhandledrejection', function(e){ __showPreviewError(String(e.reason)); });
+  setTimeout(function(){
+    if (!window.__errorOverlayShown && document.getElementById('root') && document.getElementById('root').innerHTML.trim() === '') {
+      __showPreviewError('Halaman kosong (kemungkinan kode React gagal jalan / kepotong, tapi gak ada error yang tertangkap).');
+    }
+  }, 4000);
+<\/script>`;
+
+  if (/<head[^>]*>/i.test(code)) {
+    return code.replace(/<head[^>]*>/i, (m) => m + overlayScript);
+  }
+  return overlayScript + code;
+}
+
 async function loadAiUsage(){
   try {
     const res = await fetch('/api/generate/info');
@@ -691,7 +720,7 @@ async function runGenerate(){
     setTimeout(() => {
       document.getElementById('promptOutput').style.display = 'none';
       document.getElementById('aiResultPane').style.display = 'block';
-      document.getElementById('aiPreviewFrame').srcdoc = currentGeneratedCode;
+      document.getElementById('aiPreviewFrame').srcdoc = wrapPreviewWithErrorOverlay(currentGeneratedCode);
       document.getElementById('saveResultBox').style.display = 'none';
       const bizName = document.getElementById('bizName').value.trim();
       document.getElementById('saveNameInput2').value = bizName || 'Project Baru';
