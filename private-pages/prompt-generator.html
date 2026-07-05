@@ -140,6 +140,16 @@
     </div>
 
     <div class="field">
+      <label class="toggle" style="margin-bottom:8px;">
+        <input type="checkbox" id="logoToggle" checked />
+        <span>🖼️ Punya logo (bisa diupload & diganti lewat panel admin)</span>
+      </label>
+      <div id="logoTextRow">
+        <input type="text" id="logoFallbackText" placeholder="Kalau belum ada logo dulu, tampilkan teks apa? (misal: nama bisnis singkat)" />
+      </div>
+    </div>
+
+    <div class="field">
       <label>Fitur Tambahan</label>
       <div class="chip-group" id="featureChips">
         <div class="chip active" id="waChip" data-val="Tombol kontak WhatsApp mengambang">Tombol WhatsApp</div>
@@ -358,6 +368,15 @@ function syncWaFields(){
 waChip.addEventListener('click', syncWaFields);
 syncWaFields();
 
+// Tampilkan/sembunyikan kotak fallback teks logo sesuai toggle
+const logoToggle = document.getElementById('logoToggle');
+const logoTextRow = document.getElementById('logoTextRow');
+function syncLogoRow(){
+  logoTextRow.style.display = logoToggle.checked ? 'block' : 'none';
+}
+logoToggle.addEventListener('change', syncLogoRow);
+syncLogoRow();
+
 function getActiveVals(containerId) {
   return Array.from(document.querySelectorAll('#' + containerId + ' .active')).map(el => el.dataset.val);
 }
@@ -381,6 +400,8 @@ document.getElementById('generateBtn').addEventListener('click', () => {
   const lang = document.getElementById('langSelect').value;
   const adminUsername = document.getElementById('adminUsername').value.trim() || 'admin';
   const adminPassword = document.getElementById('adminPassword').value.trim() || 'admin123';
+  const wantsLogo = document.getElementById('logoToggle').checked;
+  const logoFallback = document.getElementById('logoFallbackText').value.trim();
 
   const contractHooks = document.getElementById('contractHooks').textContent.trim();
   const contractUploader = document.getElementById('contractUploader').textContent.trim();
@@ -437,10 +458,14 @@ document.getElementById('generateBtn').addEventListener('click', () => {
 '4. UPLOAD FOTO HARUS PAKAI POLA INI (SALIN PERSIS):\n\n' +
 '```jsx\n' + contractUploader + '\n```\n\n' +
 'JANGAN PERNAH pakai `URL.createObjectURL(file)` untuk foto yang mau disimpan permanen — itu cuma sementara dan akan hilang saat refresh.\n\n' +
-'5. HALAMAN ADMIN\n' +
-'Buat panel admin (bisa diakses lewat tombol kecil/ikon gear yang gak terlalu mencolok di navbar) yang bisa mengedit semua field di `siteData` sesuai section yang ada. Login admin pakai username "' + adminUsername + '" dan password "' + adminPassword + '" (dicek langsung di kode, gak perlu backend khusus untuk ini).\n\n' +
+(wantsLogo ?
+'5. LOGO\n' +
+'Tambahkan field `logo` di dalam `defaultSiteData.design` (jadi `design.logo`, isi awal boleh null/kosong). Tampilkan logo itu di navbar (pojok kiri). Kalau `design.logo` masih kosong, tampilkan teks fallback: "' + (logoFallback || '(nama bisnis)') + '" sebagai gantinya. Logo ini HARUS bisa diupload/diganti lewat panel admin, pakai pola upload yang sama seperti poin 4 di atas (base64 lewat FileReader), disimpan di `design.logo`.\n\n'
+: '') +
+(wantsLogo ? '6. HALAMAN ADMIN\n' : '5. HALAMAN ADMIN\n') +
+'Buat panel admin (bisa diakses lewat tombol kecil/ikon gear yang gak terlalu mencolok di navbar) yang bisa mengedit semua field di `siteData` sesuai section yang ada' + (wantsLogo ? ', termasuk upload logo' : '') + '. Login admin pakai username "' + adminUsername + '" dan password "' + adminPassword + '" (dicek langsung di kode, gak perlu backend khusus untuk ini).\n\n' +
 'TAMBAHAN WAJIB: Selain tombol gear, buat juga supaya kalau pengunjung membuka website dengan menambahkan `#admin` di akhir URL (contoh: namadomain.com/#admin), halaman login admin langsung otomatis muncul. Caranya: cek `window.location.hash === "#admin"` di komponen App saat pertama kali render (pakai useEffect), kalau cocok maka langsung set tampilan ke halaman login (bukan ke halaman publik).\n\n' +
-'6. RESPONSIVE\n' +
+(wantsLogo ? '7. RESPONSIVE\n' : '6. RESPONSIVE\n') +
 'Pastikan tampilan rapi di HP (mobile-first) dan desktop.\n\n' +
 'Tolong langsung berikan kode HTML lengkapnya, tanpa penjelasan panjang di luar kode.';
 
