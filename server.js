@@ -12,9 +12,6 @@ const { generateHtmlFromPrompt, extractCode, getSetting, setSetting, getAiConfig
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const FREE_WORKSPACE_LIMIT = 3;
-const FREE_PAGES_PER_WORKSPACE_LIMIT = 3;
-const FREE_AI_GENERATION_LIMIT = 3;
 
 app.use(express.json({ limit: '15mb' }));
 app.use(cookieParser());
@@ -31,6 +28,13 @@ function isOrgPro(org) {
 async function getOrg(orgId) {
   const r = await pool.query('SELECT * FROM orgs WHERE id = $1', [orgId]);
   return r.rows[0] || null;
+}
+
+// Ambil batasan paket (workspace/halaman/member/AI) sesuai paket tim (free/pro)
+async function getPlanLimits(org) {
+  const planName = isOrgPro(org) ? 'pro' : 'free';
+  const r = await pool.query('SELECT * FROM plans WHERE name = $1', [planName]);
+  return r.rows[0] || { max_workspaces: 3, max_pages_per_workspace: 3, max_members_per_workspace: 2, max_ai_generations: 3 };
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +148,7 @@ app.post('/api/auth/logout', (req, res) => {
 
 app.get('/api/me', requireAuth, async (req, res) => {
   const org = await getOrg(req.user.orgId);
+  const limits = await getPlanLimits(org);
   res.json({
     email: req.user.email,
     org: org ? {
@@ -152,8 +157,12 @@ app.get('/api/me', requireAuth, async (req, res) => {
       plan: isOrgPro(org) ? 'pro' : 'free',
       subscriptionExpiresAt: org.subscription_expires_at
     } : null,
-    freeWorkspaceLimit: FREE_WORKSPACE_LIMIT,
-    freePagesPerWorkspaceLimit: FREE_PAGES_PER_WORKSPACE_LIMIT
+    limits: {
+      maxWorkspaces: limits.max_workspaces,
+      maxPagesPerWorkspace: limits.max_pages_per_workspace,
+      maxMembersPerWorkspace: limits.max_members_per_workspace,
+      maxAiGenerations: limits.max_ai_generations
+    }
   });
 });
 
@@ -175,10 +184,11 @@ app.post('/api/workspaces', requireAuth, async (req, res) => {
   if (!name || !name.trim()) return res.status(400).json({ error: 'Nama workspace wajib diisi' });
 
   const org = await getOrg(req.user.orgId);
+  const limits = await getPlanLimits(org);
   const countRes = await pool.query('SELECT COUNT(*)::int AS c FROM workspaces WHERE org_id = $1', [req.user.orgId]);
-  if (!isOrgPro(org) && countRes.rows[0].c >= FREE_WORKSPACE_LIMIT) {
+  if (countRes.rows[0].c >= limits.max_workspaces) {
     return res.status(402).json({
-      error: 'Paket gratis cuma bisa bikin ' + FREE_WORKSPACE_LIMIT + ' workspace. Upgrade ke Pro buat bikin lebih banyak.',
+      error: 'Paket kamu cuma bisa bikin ' + limits.max_workspaces + ' workspace. Upgrade ke Pro buat bikin lebih banyak.',
       upgradeRequired: true
     });
   }
@@ -189,12 +199,88 @@ app.post('/api/workspaces', requireAuth, async (req, res) => {
     'INSERT INTO workspaces (id, org_id, name, created_at) VALUES ($1,$2,$3,$4)',
     [id, req.user.orgId, name.trim(), createdAt]
   );
+  // pembuat workspace otomatis jadi member pertama
+  await pool.query(
+    'INSERT INTO workspace_members (workspace_id, user_id, added_at) VALUES ($1,$2,$3)',
+    [id, req.user.userId, createdAt]
+  );
   res.json({ id, name: name.trim(), createdAt, pageCount: 0 });
 });
 
 app.delete('/api/workspaces/:id', requireAuth, async (req, res) => {
   const r = await pool.query('DELETE FROM workspaces WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
   if (r.rowCount === 0) return res.status(404).json({ error: 'tidak ditemukan' });
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Anggota Workspace — undang orang lain buat kerja bareng di 1 workspace
+// ---------------------------------------------------------------------------
+app.get('/api/workspaces/:id/members', requireAuth, async (req, res) => {
+  const wsCheck = await pool.query('SELECT id FROM workspaces WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
+  if (!wsCheck.rows[0]) return res.status(404).json({ error: 'Workspace tidak ditemukan' });
+
+  const r = await pool.query(
+    `SELECT u.id, u.email, u.role, wm.added_at AS "addedAt"
+     FROM workspace_members wm
+     JOIN users u ON u.id = wm.user_id
+     WHERE wm.workspace_id = $1
+     ORDER BY wm.added_at ASC`,
+    [req.params.id]
+  );
+  res.json(r.rows);
+});
+
+app.post('/api/workspaces/:id/members', requireAuth, async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Email dan password wajib diisi' });
+
+  const wsCheck = await pool.query('SELECT id FROM workspaces WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
+  if (!wsCheck.rows[0]) return res.status(404).json({ error: 'Workspace tidak ditemukan' });
+
+  const org = await getOrg(req.user.orgId);
+  const limits = await getPlanLimits(org);
+  const memberCountRes = await pool.query('SELECT COUNT(*)::int AS c FROM workspace_members WHERE workspace_id = $1', [req.params.id]);
+  if (memberCountRes.rows[0].c >= limits.max_members_per_workspace) {
+    return res.status(402).json({
+      error: 'Paket kamu cuma bisa punya ' + limits.max_members_per_workspace + ' member per workspace. Upgrade ke Pro buat nambah lebih banyak.',
+      upgradeRequired: true
+    });
+  }
+
+  // Cek dulu, mungkin orangnya udah punya akun di tim yang sama (tinggal ditambahin ke workspace ini)
+  let existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+  let userId;
+
+  if (existing.rows[0]) {
+    const userCheck = await pool.query('SELECT org_id FROM users WHERE id = $1', [existing.rows[0].id]);
+    if (userCheck.rows[0].org_id !== req.user.orgId) {
+      return res.status(409).json({ error: 'Email itu sudah dipakai tim lain.' });
+    }
+    userId = existing.rows[0].id;
+  } else {
+    userId = genId('user');
+    const passwordHash = await bcrypt.hash(password, 10);
+    await pool.query(
+      'INSERT INTO users (id, email, password_hash, org_id, role, created_at) VALUES ($1,$2,$3,$4,$5,$6)',
+      [userId, email, passwordHash, req.user.orgId, 'member', Date.now()]
+    );
+  }
+
+  const already = await pool.query('SELECT 1 FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', [req.params.id, userId]);
+  if (already.rows[0]) return res.status(409).json({ error: 'Orang ini sudah jadi member di workspace ini.' });
+
+  await pool.query(
+    'INSERT INTO workspace_members (workspace_id, user_id, added_at) VALUES ($1,$2,$3)',
+    [req.params.id, userId, Date.now()]
+  );
+  res.json({ ok: true, userId, email });
+});
+
+app.delete('/api/workspaces/:id/members/:userId', requireAuth, async (req, res) => {
+  const wsCheck = await pool.query('SELECT id FROM workspaces WHERE id = $1 AND org_id = $2', [req.params.id, req.user.orgId]);
+  if (!wsCheck.rows[0]) return res.status(404).json({ error: 'Workspace tidak ditemukan' });
+  await pool.query('DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', [req.params.id, req.params.userId]);
   res.json({ ok: true });
 });
 
@@ -220,12 +306,13 @@ app.post('/api/snippets', requireAuth, async (req, res) => {
   if (!wsCheck.rows[0]) return res.status(404).json({ error: 'Workspace tidak ditemukan' });
 
   const org = await getOrg(req.user.orgId);
+  const limits = await getPlanLimits(org);
   const countRes = await pool.query('SELECT COUNT(*)::int AS c FROM snippets WHERE workspace_id = $1', [workspaceId]);
   const currentCount = countRes.rows[0].c;
 
-  if (!isOrgPro(org) && currentCount >= FREE_PAGES_PER_WORKSPACE_LIMIT) {
+  if (currentCount >= limits.max_pages_per_workspace) {
     return res.status(402).json({
-      error: 'Paket gratis cuma bisa nyimpen ' + FREE_PAGES_PER_WORKSPACE_LIMIT + ' halaman per workspace. Upgrade ke Pro buat nyimpen lebih banyak, atau bikin workspace baru.',
+      error: 'Paket kamu cuma bisa nyimpen ' + limits.max_pages_per_workspace + ' halaman per workspace. Upgrade ke Pro buat nyimpen lebih banyak, atau bikin workspace baru.',
       upgradeRequired: true
     });
   }
@@ -368,9 +455,10 @@ app.post('/api/public-data/:slug', async (req, res) => {
 // ---------------------------------------------------------------------------
 app.get('/api/generate/info', requireAuth, async (req, res) => {
   const org = await getOrg(req.user.orgId);
+  const limits = await getPlanLimits(org);
   res.json({
     used: org ? org.ai_generations_used : 0,
-    limit: FREE_AI_GENERATION_LIMIT,
+    limit: limits.max_ai_generations,
     plan: isOrgPro(org) ? 'pro' : 'free'
   });
 });
@@ -380,9 +468,10 @@ app.post('/api/generate', requireAuth, async (req, res) => {
   if (!prompt || !prompt.trim()) return res.status(400).json({ error: 'Prompt kosong' });
 
   const org = await getOrg(req.user.orgId);
-  if (!isOrgPro(org) && org.ai_generations_used >= FREE_AI_GENERATION_LIMIT) {
+  const limits = await getPlanLimits(org);
+  if (org.ai_generations_used >= limits.max_ai_generations) {
     return res.status(402).json({
-      error: 'Paket gratis cuma bisa generate otomatis ' + FREE_AI_GENERATION_LIMIT + ' kali. Upgrade ke Pro buat generate lebih banyak.',
+      error: 'Paket kamu cuma bisa generate otomatis ' + limits.max_ai_generations + ' kali. Upgrade ke Pro buat generate lebih banyak.',
       upgradeRequired: true
     });
   }
@@ -504,6 +593,32 @@ app.get('/api/superadmin/stats', requireAuth, requireSuperAdmin, async (req, res
       plan: (o.plan === 'pro' && o.subscriptionExpiresAt && Number(o.subscriptionExpiresAt) > Date.now()) ? 'pro' : 'free'
     }))
   });
+});
+
+app.get('/api/superadmin/plans', requireAuth, requireSuperAdmin, async (req, res) => {
+  const r = await pool.query('SELECT * FROM plans ORDER BY name ASC');
+  res.json(r.rows.map((p) => ({
+    name: p.name,
+    maxWorkspaces: p.max_workspaces,
+    maxPagesPerWorkspace: p.max_pages_per_workspace,
+    maxMembersPerWorkspace: p.max_members_per_workspace,
+    maxAiGenerations: p.max_ai_generations
+  })));
+});
+
+app.post('/api/superadmin/plans/:name', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { maxWorkspaces, maxPagesPerWorkspace, maxMembersPerWorkspace, maxAiGenerations } = req.body || {};
+  const r = await pool.query(
+    `UPDATE plans SET
+      max_workspaces = $2,
+      max_pages_per_workspace = $3,
+      max_members_per_workspace = $4,
+      max_ai_generations = $5
+     WHERE name = $1`,
+    [req.params.name, maxWorkspaces, maxPagesPerWorkspace, maxMembersPerWorkspace, maxAiGenerations]
+  );
+  if (r.rowCount === 0) return res.status(404).json({ error: 'Paket tidak ditemukan' });
+  res.json({ ok: true });
 });
 
 app.get('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {

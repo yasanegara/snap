@@ -153,8 +153,19 @@ Kalau login pakai email lain (bukan superadmin), otomatis ditolak/diarahkan bali
 ### Isinya
 
 - Ringkasan angka: total tim, tim Pro, user, workspace, halaman, publish, generate AI, **total token terpakai, dan estimasi biaya AI dalam Dolar**
-- **Pengaturan AI**: ganti model yang dipakai dan atur/ganti API key langsung dari sini (gak perlu buka Railway)
+- **📦 Pengaturan Paket**: atur langsung batasan tiap paket (Gratis/Pro) — jumlah workspace, jumlah halaman per workspace, jumlah member per workspace, dan jumlah generate AI. Perubahan langsung berlaku ke semua tim yang pakai paket itu.
+- **⚙️ Pengaturan AI**: ganti model yang dipakai dan atur/ganti API key langsung dari sini (gak perlu buka Railway)
 - Tabel semua tim, bisa dicari pakai nama, lengkap sama pemakaian token per tim
+
+## Fitur Anggota Workspace (undang orang buat kerja bareng)
+
+Tiap workspace sekarang bisa diisi lebih dari 1 orang. Caranya:
+1. Di tool preview (`/app`), pilih workspace yang mau ditambahin anggota
+2. Klik tombol **👥 Anggota**
+3. Isi email & password buat orang yang mau diundang, klik **Undang**
+4. Orang itu langsung bisa login pakai email & password itu, dan otomatis masuk ke tim serta workspace yang sama
+
+Jumlah anggota per workspace dibatasi sesuai paket (atur di Panel Superadmin → Pengaturan Paket).
 
 ## Batasan paket Gratis
 

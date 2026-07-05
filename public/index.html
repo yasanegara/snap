@@ -206,7 +206,10 @@
     <div style="padding:12px 14px 8px;border-bottom:1px solid var(--line);">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;">Workspace</div>
       <select id="workspaceSelect" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:7px 8px;border-radius:7px;font-size:12.5px;margin-bottom:8px;"></select>
-      <button class="btn" id="newWorkspaceBtn" style="width:100%;padding:6px;font-size:12px;">+ Workspace Baru</button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn" id="newWorkspaceBtn" style="flex:1;padding:6px;font-size:12px;">+ Workspace</button>
+        <button class="btn" id="manageMembersBtn" style="flex:1;padding:6px;font-size:12px;">👥 Anggota</button>
+      </div>
     </div>
     <h2>Halaman di Workspace Ini</h2>
     <div class="history-list" id="historyList">
@@ -276,6 +279,21 @@
     <div class="row">
       <button class="btn" id="cancelWorkspaceBtn">Batal</button>
       <button class="btn primary" id="confirmWorkspaceBtn">Buat</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="membersModal">
+  <div class="modal" style="width:380px;">
+    <h3>Anggota Workspace</h3>
+    <div id="membersList" style="margin-bottom:14px;max-height:180px;overflow-y:auto;"></div>
+    <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px;">Undang orang baru</label>
+    <input type="text" id="inviteEmailInput" placeholder="Email orangnya" />
+    <input type="text" id="invitePasswordInput" placeholder="Password buat login pertama kali" />
+    <div id="inviteResult" style="display:none;font-size:12px;margin-bottom:12px;padding:8px 10px;border-radius:7px;"></div>
+    <div class="row">
+      <button class="btn" id="closeMembersBtn">Tutup</button>
+      <button class="btn primary" id="confirmInviteBtn">Undang</button>
     </div>
   </div>
 </div>
@@ -364,6 +382,81 @@ document.getElementById('confirmWorkspaceBtn').onclick = async () => {
     await loadWorkspaces(data.id);
   } catch (e) {
     alert('Gagal membuat workspace.\n\nDetail: ' + e.message);
+  }
+};
+
+// ---------- Anggota Workspace ----------
+async function loadMembers(){
+  const listEl = document.getElementById('membersList');
+  if (!currentWorkspaceId) { listEl.innerHTML = '<div class="empty-hint">Pilih workspace dulu.</div>'; return; }
+  try {
+    const res = await fetch('/api/workspaces/' + currentWorkspaceId + '/members');
+    if (!res.ok) throw new Error('Gagal memuat anggota');
+    const members = await res.json();
+    if (members.length === 0) {
+      listEl.innerHTML = '<div class="empty-hint">Belum ada anggota lain.</div>';
+      return;
+    }
+    listEl.innerHTML = members.map(m => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;">
+        <span>${m.email}${m.role === 'owner' ? ' (owner)' : ''}</span>
+        ${m.role !== 'owner' ? '<button class="remove-member-btn" data-user="' + m.id + '" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:12px;">Hapus</button>' : ''}
+      </div>
+    `).join('');
+    listEl.querySelectorAll('.remove-member-btn').forEach(btn => {
+      btn.onclick = async () => {
+        if (!confirm('Hapus orang ini dari workspace?')) return;
+        await fetch('/api/workspaces/' + currentWorkspaceId + '/members/' + btn.dataset.user, { method: 'DELETE' });
+        loadMembers();
+      };
+    });
+  } catch (e) {
+    listEl.innerHTML = '<div class="empty-hint">Gagal memuat anggota.</div>';
+  }
+}
+
+document.getElementById('manageMembersBtn').onclick = () => {
+  if (!currentWorkspaceId) { alert('Pilih/bikin workspace dulu ya.'); return; }
+  document.getElementById('inviteEmailInput').value = '';
+  document.getElementById('invitePasswordInput').value = '';
+  document.getElementById('inviteResult').style.display = 'none';
+  document.getElementById('membersModal').classList.add('show');
+  loadMembers();
+};
+document.getElementById('closeMembersBtn').onclick = () => {
+  document.getElementById('membersModal').classList.remove('show');
+};
+document.getElementById('confirmInviteBtn').onclick = async () => {
+  const email = document.getElementById('inviteEmailInput').value.trim();
+  const password = document.getElementById('invitePasswordInput').value;
+  const resultBox = document.getElementById('inviteResult');
+  if (!email || !password) { alert('Isi email dan password dulu ya.'); return; }
+  try {
+    const res = await fetch('/api/workspaces/' + currentWorkspaceId + '/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (res.status === 402) {
+      if (confirm((data.error || 'Batas member sudah penuh.') + '\n\nBuka halaman upgrade sekarang?')) {
+        window.location.href = '/billing.html';
+      }
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || 'Gagal mengundang');
+    resultBox.style.display = 'block';
+    resultBox.style.background = '#0f2e29';
+    resultBox.style.color = '#a7f3e8';
+    resultBox.textContent = 'Berhasil! ' + email + ' sekarang bisa login pakai password yang tadi kamu isi.';
+    document.getElementById('inviteEmailInput').value = '';
+    document.getElementById('invitePasswordInput').value = '';
+    loadMembers();
+  } catch (e) {
+    resultBox.style.display = 'block';
+    resultBox.style.background = '#2a1010';
+    resultBox.style.color = '#ff9c9c';
+    resultBox.textContent = 'Gagal: ' + e.message;
   }
 };
 

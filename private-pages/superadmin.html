@@ -52,6 +52,14 @@
     background:var(--accent); color:#04211d; border:none; padding:9px 18px;
     border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;
   }
+  .plan-row{ display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .plan-row .plan-name{ width:70px; font-weight:700; text-transform:capitalize; font-size:13px; }
+  .plan-row .plan-field{ display:flex; flex-direction:column; gap:4px; }
+  .plan-row .plan-field label{ font-size:10.5px; color:var(--muted); }
+  .plan-row .plan-field input{
+    width:100px; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    padding:7px 9px; border-radius:7px; font-size:12.5px; outline:none;
+  }
 </style>
 </head>
 <body>
@@ -64,6 +72,11 @@
 <div class="wrap">
   <div class="cards" id="cards">
     <div class="loading">Memuat data...</div>
+  </div>
+
+  <h2>📦 Pengaturan Paket</h2>
+  <div class="settings-box" id="plansBox">
+    <div class="loading">Memuat paket...</div>
   </div>
 
   <h2>⚙️ Pengaturan AI</h2>
@@ -175,6 +188,56 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 });
 
 loadStats();
+
+// ---------- Pengaturan Paket ----------
+async function loadPlans(){
+  try {
+    const res = await fetch('/api/superadmin/plans');
+    if (!res.ok) return;
+    const plans = await res.json();
+    const box = document.getElementById('plansBox');
+    box.innerHTML = plans.map(p => `
+      <div class="plan-row" data-plan="${p.name}">
+        <div class="plan-name">${p.name}</div>
+        <div class="plan-field"><label>Max Workspace</label><input type="number" min="0" class="f-workspaces" value="${p.maxWorkspaces}" /></div>
+        <div class="plan-field"><label>Max Halaman/Workspace</label><input type="number" min="0" class="f-pages" value="${p.maxPagesPerWorkspace}" /></div>
+        <div class="plan-field"><label>Max Member/Workspace</label><input type="number" min="0" class="f-members" value="${p.maxMembersPerWorkspace}" /></div>
+        <div class="plan-field"><label>Max AI Generate</label><input type="number" min="0" class="f-ai" value="${p.maxAiGenerations}" /></div>
+        <button class="btn-save save-plan-btn" style="align-self:flex-end;">Simpan</button>
+        <span class="plan-save-status" style="font-size:12px;color:var(--muted);align-self:flex-end;"></span>
+      </div>
+    `).join('');
+
+    box.querySelectorAll('.save-plan-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('.plan-row');
+        const planName = row.dataset.plan;
+        const statusEl = row.querySelector('.plan-save-status');
+        statusEl.textContent = 'Menyimpan...';
+        try {
+          const res = await fetch('/api/superadmin/plans/' + planName, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              maxWorkspaces: parseInt(row.querySelector('.f-workspaces').value, 10),
+              maxPagesPerWorkspace: parseInt(row.querySelector('.f-pages').value, 10),
+              maxMembersPerWorkspace: parseInt(row.querySelector('.f-members').value, 10),
+              maxAiGenerations: parseInt(row.querySelector('.f-ai').value, 10)
+            })
+          });
+          if (!res.ok) throw new Error('Gagal menyimpan');
+          statusEl.textContent = 'Tersimpan ✓';
+          setTimeout(() => { statusEl.textContent = ''; }, 2000);
+        } catch (e) {
+          statusEl.textContent = 'Gagal: ' + e.message;
+        }
+      });
+    });
+  } catch (e) {
+    document.getElementById('plansBox').innerHTML = '<div class="loading">Gagal memuat paket.</div>';
+  }
+}
+loadPlans();
 
 // ---------- Pengaturan AI ----------
 async function loadAiSettings(){
