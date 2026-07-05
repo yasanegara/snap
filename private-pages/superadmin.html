@@ -82,14 +82,38 @@
   <h2>⚙️ Pengaturan AI</h2>
   <div class="settings-box" id="settingsBox">
     <div class="field">
-      <label>Model AI yang dipakai</label>
-      <select id="modelSelect"></select>
+      <label>Pakai AI dari mana?</label>
+      <select id="providerSelect">
+        <option value="anthropic">Anthropic (langsung)</option>
+        <option value="sumopod">Sumopod (ai.sumopod.com)</option>
+      </select>
     </div>
-    <div class="field">
-      <label>API Key Anthropic</label>
-      <input type="text" id="apiKeyInput" placeholder="sk-ant-... (kosongkan kalau gak mau ganti)" />
-      <p class="hint" id="apiKeySourceHint"></p>
+
+    <div id="anthropicFields">
+      <div class="field">
+        <label>Model Anthropic</label>
+        <select id="anthropicModelSelect"></select>
+      </div>
+      <div class="field">
+        <label>API Key Anthropic</label>
+        <input type="text" id="anthropicApiKeyInput" placeholder="sk-ant-... (kosongkan kalau gak mau ganti)" />
+        <p class="hint" id="anthropicKeyHint"></p>
+      </div>
     </div>
+
+    <div id="sumopodFields" style="display:none;">
+      <div class="field">
+        <label>Nama Model di Sumopod</label>
+        <input type="text" id="sumopodModelInput" placeholder="misal: claude-sonnet-4-6, gpt-5.2, gemini/gemini-2.5-flash" />
+        <p class="hint">Cek daftar model lengkap & harganya di ai.sumopod.com → AI → Model Hub.</p>
+      </div>
+      <div class="field">
+        <label>API Key Sumopod</label>
+        <input type="text" id="sumopodApiKeyInput" placeholder="sk-... (kosongkan kalau gak mau ganti)" />
+        <p class="hint" id="sumopodKeyHint"></p>
+      </div>
+    </div>
+
     <button class="btn-save" id="saveSettingsBtn">Simpan Pengaturan</button>
     <span id="saveSettingsStatus" style="margin-left:10px;font-size:12.5px;color:var(--muted);"></span>
   </div>
@@ -240,37 +264,64 @@ async function loadPlans(){
 loadPlans();
 
 // ---------- Pengaturan AI ----------
+function keySourceText(src){
+  return src === 'database' ? 'Diatur lewat panel ini' :
+    src === 'env' ? 'Diatur lewat env var Railway' : 'Belum diset sama sekali';
+}
+
+function syncProviderFields(){
+  const provider = document.getElementById('providerSelect').value;
+  document.getElementById('anthropicFields').style.display = provider === 'anthropic' ? 'block' : 'none';
+  document.getElementById('sumopodFields').style.display = provider === 'sumopod' ? 'block' : 'none';
+}
+
 async function loadAiSettings(){
   try {
     const res = await fetch('/api/superadmin/settings');
     if (!res.ok) return;
     const s = await res.json();
-    const modelSelect = document.getElementById('modelSelect');
-    modelSelect.innerHTML = s.availableModels.map(m =>
-      '<option value="' + m + '"' + (m === s.model ? ' selected' : '') + '>' + m + '</option>'
+
+    document.getElementById('providerSelect').value = s.provider;
+    syncProviderFields();
+
+    const modelSelect = document.getElementById('anthropicModelSelect');
+    modelSelect.innerHTML = s.anthropic.availableModels.map(m =>
+      '<option value="' + m + '"' + (m === s.anthropic.model ? ' selected' : '') + '>' + m + '</option>'
     ).join('');
-    const sourceText = s.apiKeySource === 'database' ? 'Diatur lewat panel ini' :
-      s.apiKeySource === 'env' ? 'Diatur lewat env var Railway (ANTHROPIC_API_KEY)' : 'Belum diset sama sekali';
-    document.getElementById('apiKeySourceHint').textContent =
-      (s.apiKeyMasked ? 'Key aktif sekarang: ' + s.apiKeyMasked + ' — ' : '') + sourceText;
+    document.getElementById('anthropicKeyHint').textContent = keySourceText(s.anthropic.keySource);
+
+    document.getElementById('sumopodModelInput').value = s.sumopod.model;
+    document.getElementById('sumopodKeyHint').textContent = keySourceText(s.sumopod.keySource);
   } catch (e) { /* biarin */ }
 }
 loadAiSettings();
 
+document.getElementById('providerSelect').addEventListener('change', syncProviderFields);
+
 document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
-  const model = document.getElementById('modelSelect').value;
-  const apiKey = document.getElementById('apiKeyInput').value.trim();
+  const provider = document.getElementById('providerSelect').value;
+  const anthropicModel = document.getElementById('anthropicModelSelect').value;
+  const anthropicApiKey = document.getElementById('anthropicApiKeyInput').value.trim();
+  const sumopodModel = document.getElementById('sumopodModelInput').value.trim();
+  const sumopodApiKey = document.getElementById('sumopodApiKeyInput').value.trim();
   const statusEl = document.getElementById('saveSettingsStatus');
   statusEl.textContent = 'Menyimpan...';
   try {
     const res = await fetch('/api/superadmin/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, apiKey: apiKey || undefined })
+      body: JSON.stringify({
+        provider,
+        anthropicModel,
+        anthropicApiKey: anthropicApiKey || undefined,
+        sumopodModel,
+        sumopodApiKey: sumopodApiKey || undefined
+      })
     });
     if (!res.ok) throw new Error('Gagal menyimpan');
     statusEl.textContent = 'Tersimpan ✓';
-    document.getElementById('apiKeyInput').value = '';
+    document.getElementById('anthropicApiKeyInput').value = '';
+    document.getElementById('sumopodApiKeyInput').value = '';
     loadAiSettings();
     setTimeout(() => { statusEl.textContent = ''; }, 2000);
   } catch (e) {

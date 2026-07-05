@@ -116,12 +116,19 @@ Di halaman Prompt Generator, sekarang ada tombol **🤖 Generate Otomatis** di s
 
 ### Setup yang dibutuhkan
 
-Sekarang API key dan model AI bisa diatur **langsung dari Panel Superadmin** (lihat bagian di bawah), gak perlu lewat Railway lagi. Tapi kalau mau tetap pakai env var juga bisa:
+Sekarang API key dan model AI diatur **langsung dari Panel Superadmin**, gak perlu lewat Railway lagi. Ada 2 pilihan sumber AI:
 
-1. Buat akun di https://console.anthropic.com kalau belum ada
+**Opsi 1: Anthropic langsung**
+1. Buat akun di https://console.anthropic.com
 2. Buka menu **API Keys** → **Create Key**
-3. Copy key-nya (mulai dengan `sk-ant-...`)
-4. Masukin lewat **Panel Superadmin → Pengaturan AI** (lebih gampang), ATAU tambahin env var `ANTHROPIC_API_KEY` di Railway
+3. Masukin lewat **Panel Superadmin → Pengaturan AI**, pilih provider "Anthropic (langsung)"
+
+**Opsi 2: Sumopod** (layanan AI buatan Indonesia, biasanya lebih murah, bisa pilih dari banyak model — Claude, GPT, Gemini, DeepSeek, dll dalam 1 tempat)
+1. Buat akun & API key di https://ai.sumopod.com (menu AI → API Keys → Create key)
+2. Masukin lewat **Panel Superadmin → Pengaturan AI**, pilih provider "Sumopod"
+3. Isi nama model yang mau dipakai (cek daftarnya di ai.sumopod.com → AI → Model Hub, misal `claude-sonnet-4-6`, `gpt-5.2`, `gemini/gemini-2.5-flash`)
+
+Kamu bisa gonta-ganti provider kapan aja lewat Panel Superadmin, gak perlu redeploy.
 
 ### Biaya
 

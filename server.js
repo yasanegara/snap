@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');
 const { pool, migrate } = require('./lib/db');
 const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny, requireSuperAdmin, requireSuperAdminPage } = require('./lib/auth');
 const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
-const { generateHtmlFromPrompt, extractCode, getSetting, setSetting, getAiConfig, estimateCostUSD, PRICING } = require('./lib/ai');
+const { generateHtmlFromPrompt, extractCode, getSetting, setSetting, getAiConfig, estimateCostUSD, PRICING, ANTHROPIC_MODELS } = require('./lib/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -622,19 +622,34 @@ app.post('/api/superadmin/plans/:name', requireAuth, requireSuperAdmin, async (r
 });
 
 app.get('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {
-  const { model, apiKey } = await getAiConfig();
+  const { provider, model, apiKey } = await getAiConfig();
+
+  const anthropicKeySrc = (await getSetting('ai_api_key_anthropic', null)) ? 'database' : (process.env.ANTHROPIC_API_KEY ? 'env' : 'belum-diset');
+  const sumopodKeySrc = (await getSetting('ai_api_key_sumopod', null)) ? 'database' : (process.env.SUMOPOD_API_KEY ? 'env' : 'belum-diset');
+
   res.json({
+    provider,
     model,
     apiKeyMasked: apiKey ? apiKey.slice(0, 10) + '...' + apiKey.slice(-4) : '',
-    apiKeySource: (await getSetting('ai_api_key', null)) ? 'database' : (process.env.ANTHROPIC_API_KEY ? 'env' : 'belum-diset'),
-    availableModels: Object.keys(PRICING)
+    anthropic: {
+      model: (await getSetting('ai_model_anthropic', null)) || process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+      keySource: anthropicKeySrc,
+      availableModels: ANTHROPIC_MODELS
+    },
+    sumopod: {
+      model: (await getSetting('ai_model_sumopod', null)) || process.env.SUMOPOD_MODEL || 'claude-sonnet-4-6',
+      keySource: sumopodKeySrc
+    }
   });
 });
 
 app.post('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {
-  const { model, apiKey } = req.body || {};
-  if (model) await setSetting('ai_model', model);
-  if (apiKey) await setSetting('ai_api_key', apiKey);
+  const { provider, anthropicModel, anthropicApiKey, sumopodModel, sumopodApiKey } = req.body || {};
+  if (provider) await setSetting('ai_provider', provider);
+  if (anthropicModel) await setSetting('ai_model_anthropic', anthropicModel);
+  if (anthropicApiKey) await setSetting('ai_api_key_anthropic', anthropicApiKey);
+  if (sumopodModel) await setSetting('ai_model_sumopod', sumopodModel);
+  if (sumopodApiKey) await setSetting('ai_api_key_sumopod', sumopodApiKey);
   res.json({ ok: true });
 });
 
