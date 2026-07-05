@@ -1119,6 +1119,20 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// Kalau baru aja generate lewat AI (dari halaman Prompt Generator), muat kodenya otomatis
+function loadPendingGeneratedCode(){
+  const pendingCode = sessionStorage.getItem('__pendingGeneratedCode');
+  if (!pendingCode) return;
+  const pendingType = sessionStorage.getItem('__pendingGeneratedType') || 'html';
+  sessionStorage.removeItem('__pendingGeneratedCode');
+  sessionStorage.removeItem('__pendingGeneratedType');
+  codeInput.value = pendingCode;
+  setType(pendingType);
+  statusBar.textContent = 'Kode hasil Generate Otomatis dimuat. Menjalankan preview...';
+  runPreview();
+}
+loadPendingGeneratedCode();
+
 loadHistory();
 </script>
 </body>

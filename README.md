@@ -108,6 +108,31 @@ Setelah project di-Run dan tampilannya udah pas, klik tombol **🚀 Publish** di
 - 1 slug cuma bisa dipakai 1 tim. Kalau slug udah dipakai tim lain, akan ditolak otomatis.
 - Halaman yang sudah dipublish bisa dibuka siapa aja tanpa perlu login (memang tujuannya buat publik).
 
+## Fitur Generate Otomatis (AI langsung bikin kode)
+
+Di halaman Prompt Generator, sekarang ada tombol **🤖 Generate Otomatis** di samping "Generate Prompt". Bedanya:
+- **Generate Prompt** → kamu copy manual ke Gemini/Claude sendiri
+- **Generate Otomatis** → AI langsung bikin kodenya dari server, hasilnya langsung kebuka di tool preview
+
+### Setup yang dibutuhkan
+
+1. Buat akun di https://console.anthropic.com kalau belum ada
+2. Buka menu **API Keys** → **Create Key**
+3. Copy key-nya (mulai dengan `sk-ant-...`)
+4. Di Railway, buka service aplikasi kamu → tab **Variables** → tambahkan:
+   ```
+   ANTHROPIC_API_KEY=sk-ant-...
+   ```
+5. Redeploy
+
+### Biaya
+
+Ini bukan gratis dari Anthropic — tiap kali generate, server kamu bayar ke Anthropic sesuai jumlah token yang dipakai (biasanya beberapa ratus sampai beberapa ribu Rupiah per halaman, tergantung kompleksitas). Karena itu ada batasan:
+- **Paket gratis**: 3 kali generate otomatis (total, bukan per bulan)
+- **Paket Pro**: tanpa batas
+
+Kalau mau ganti model AI yang dipakai, tambahkan env var `ANTHROPIC_MODEL` di Railway (defaultnya `claude-sonnet-5`).
+
 ## Batasan paket Gratis
 
 Sekarang cuma dibatasi **jumlah project tersimpan (maksimal 3)**. Kalau mau nambah batasan lain (misal fitur tertentu dikunci), bilang aja, saya tambahin.

@@ -192,6 +192,8 @@
     </div>
 
     <button class="btn primary" id="generateBtn">✨ Generate Prompt</button>
+    <button class="btn primary" id="generateAiBtn" style="margin-top:8px;background:#7C3AED;">🤖 Generate Otomatis (AI langsung bikin)</button>
+    <p class="hint" id="aiUsageHint" style="margin-top:8px;text-align:center;"></p>
   </div>
 
   <div class="result-pane">
@@ -385,7 +387,7 @@ function getActiveVals(containerId) {
   return Array.from(document.querySelectorAll('#' + containerId + ' .active')).map(el => el.dataset.val);
 }
 
-document.getElementById('generateBtn').addEventListener('click', () => {
+function buildPromptText(){
   const bizName = document.getElementById('bizName').value.trim() || '(isi nama bisnis)';
   const bizType = document.getElementById('bizType').value.trim() || '(isi jenis bisnis)';
   const bizAudience = document.getElementById('bizAudience').value.trim() || '(isi target audiens)';
@@ -428,7 +430,7 @@ document.getElementById('generateBtn').addEventListener('click', () => {
   }).join('\n') : '- (bebas, tentukan sendiri section yang relevan)';
   const featureList = features.length ? features.map(f => '- ' + f).join('\n') : '- (tidak ada fitur tambahan khusus)';
 
-  const prompt = 'Kamu berperan sebagai Senior UI/UX Designer yang juga seorang Master Marketing berpengalaman bertahun-tahun membuat website untuk bisnis kecil-menengah yang sukses konversi. Gunakan kemampuan desainmu untuk membuat keputusan matang soal tata letak, warna, tipografi, dan kenyamanan pengguna — sekaligus gunakan insting marketing-mu untuk menyusun copywriting yang persuasif, alur cerita yang membangun kepercayaan, dan call-to-action yang efektif mendorong pengunjung bertindak. Jangan bikin template asal jadi.\n\n' +
+  return 'Kamu berperan sebagai Senior UI/UX Designer yang juga seorang Master Marketing berpengalaman bertahun-tahun membuat website untuk bisnis kecil-menengah yang sukses konversi. Gunakan kemampuan desainmu untuk membuat keputusan matang soal tata letak, warna, tipografi, dan kenyamanan pengguna — sekaligus gunakan insting marketing-mu untuk menyusun copywriting yang persuasif, alur cerita yang membangun kepercayaan, dan call-to-action yang efektif mendorong pengunjung bertindak. Jangan bikin template asal jadi.\n\n' +
 'Buatkan saya SATU FILE HTML lengkap (bukan React project terpisah) untuk website bisnis berikut:\n\n' +
 'NAMA BISNIS: ' + bizName + '\n' +
 'JENIS BISNIS: ' + bizType + '\n' +
@@ -480,7 +482,10 @@ document.getElementById('generateBtn').addEventListener('click', () => {
 (wantsLogo ? '7. RESPONSIVE\n' : '6. RESPONSIVE\n') +
 'Pastikan tampilan rapi di HP (mobile-first) dan desktop.\n\n' +
 'Tolong langsung berikan kode HTML lengkapnya, tanpa penjelasan panjang di luar kode.';
+}
 
+document.getElementById('generateBtn').addEventListener('click', () => {
+  const prompt = buildPromptText();
   document.getElementById('promptOutput').textContent = prompt;
   document.getElementById('resultStatus').textContent = prompt.length + ' karakter — siap di-copy';
   document.getElementById('copyBtn').style.display = 'inline-block';
@@ -494,6 +499,65 @@ document.getElementById('copyBtn').addEventListener('click', () => {
     btn.textContent = '✓ Ke-copy!';
     setTimeout(() => { btn.textContent = original; }, 1500);
   });
+});
+
+// ---------- Generate Otomatis (AI langsung bikin kodenya) ----------
+async function loadAiUsage(){
+  try {
+    const res = await fetch('/api/generate/info');
+    if (!res.ok) return;
+    const info = await res.json();
+    const hint = document.getElementById('aiUsageHint');
+    if (info.plan === 'pro') {
+      hint.textContent = 'Paket Pro — generate otomatis tanpa batas';
+    } else {
+      hint.textContent = 'Sisa generate otomatis gratis: ' + Math.max(0, info.limit - info.used) + ' / ' + info.limit;
+    }
+  } catch (e) { /* biarin, jangan blok halaman */ }
+}
+loadAiUsage();
+
+document.getElementById('generateAiBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('generateAiBtn');
+  const prompt = buildPromptText();
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ AI lagi bikin kodenya... (bisa 30-60 detik)';
+  document.getElementById('resultStatus').textContent = 'Menunggu AI...';
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+
+    if (res.status === 401) { window.location.href = '/login.html'; return; }
+
+    if (res.status === 402) {
+      if (confirm((data.error || 'Kuota generate otomatis sudah habis.') + '\n\nBuka halaman upgrade sekarang?')) {
+        window.location.href = '/billing.html';
+      }
+      return;
+    }
+
+    if (!res.ok) {
+      alert('Gagal generate.\n\nDetail: ' + (data.error || ('HTTP ' + res.status)));
+      return;
+    }
+
+    // Simpan kode hasil AI, buka di tool preview
+    sessionStorage.setItem('__pendingGeneratedCode', data.code);
+    sessionStorage.setItem('__pendingGeneratedType', 'html');
+    window.location.href = '/app?fromAi=1';
+  } catch (e) {
+    alert('Gagal generate.\n\nDetail: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+    loadAiUsage();
+  }
 });
 </script>
 

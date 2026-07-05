@@ -8,11 +8,13 @@ const cookieParser = require('cookie-parser');
 const { pool, migrate } = require('./lib/db');
 const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny } = require('./lib/auth');
 const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
+const { generateHtmlFromPrompt, extractCode } = require('./lib/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const FREE_WORKSPACE_LIMIT = 3;
 const FREE_PAGES_PER_WORKSPACE_LIMIT = 3;
+const FREE_AI_GENERATION_LIMIT = 3;
 
 app.use(express.json({ limit: '15mb' }));
 app.use(cookieParser());
@@ -355,6 +357,40 @@ app.post('/api/public-data/:slug', async (req, res) => {
     [req.params.slug, req.body || {}]
   );
   res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Generate Otomatis — AI langsung bikin kode halaman dari prompt
+// ---------------------------------------------------------------------------
+app.get('/api/generate/info', requireAuth, async (req, res) => {
+  const org = await getOrg(req.user.orgId);
+  res.json({
+    used: org ? org.ai_generations_used : 0,
+    limit: FREE_AI_GENERATION_LIMIT,
+    plan: isOrgPro(org) ? 'pro' : 'free'
+  });
+});
+
+app.post('/api/generate', requireAuth, async (req, res) => {
+  const { prompt } = req.body || {};
+  if (!prompt || !prompt.trim()) return res.status(400).json({ error: 'Prompt kosong' });
+
+  const org = await getOrg(req.user.orgId);
+  if (!isOrgPro(org) && org.ai_generations_used >= FREE_AI_GENERATION_LIMIT) {
+    return res.status(402).json({
+      error: 'Paket gratis cuma bisa generate otomatis ' + FREE_AI_GENERATION_LIMIT + ' kali. Upgrade ke Pro buat generate lebih banyak.',
+      upgradeRequired: true
+    });
+  }
+
+  try {
+    const rawText = await generateHtmlFromPrompt(prompt);
+    const code = extractCode(rawText);
+    await pool.query('UPDATE orgs SET ai_generations_used = ai_generations_used + 1 WHERE id = $1', [req.user.orgId]);
+    res.json({ ok: true, code });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ---------------------------------------------------------------------------
