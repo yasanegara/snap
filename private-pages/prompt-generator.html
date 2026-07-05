@@ -103,6 +103,7 @@
   .skel-line.w40{ width:40%; }
   .skel-row{ display:flex; gap:10px; margin-top:18px; }
   .skel-card{ flex:1; height:80px; }
+  .settings-box{ background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:16px; }
 </style>
 </head>
 <body>
@@ -229,6 +230,17 @@
 
     <div id="aiResultPane" style="display:none;">
       <iframe id="aiPreviewFrame" style="width:100%;height:420px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:16px;"></iframe>
+
+      <div class="settings-box" style="margin-bottom:16px;">
+        <label style="font-size:12px;font-weight:600;color:#c7ccd4;display:block;margin-bottom:8px;">🪄 Edit Section dengan AI</label>
+        <select id="editSectionSelect" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:8px;font-size:12.5px;margin-bottom:8px;">
+          <option value="">Memuat daftar section...</option>
+        </select>
+        <input type="text" id="editInstructionInput" placeholder="Contoh: buat judulnya lebih menarik buat anak muda" style="margin-bottom:8px;" />
+        <div id="editSectionResult" style="display:none;font-size:12px;margin-bottom:8px;padding:8px 10px;border-radius:7px;"></div>
+        <button class="btn" id="editSectionBtn" style="width:100%;">✨ Edit Section Ini</button>
+      </div>
+
       <div class="field">
         <label>Simpan sebagai</label>
         <input type="text" id="saveNameInput2" placeholder="Nama project, misal: Landing Warung Kopi Senja" />
@@ -542,23 +554,16 @@ document.getElementById('copyBtn').addEventListener('click', () => {
   });
 });
 
-// ---------- Generate Otomatis (AI langsung bikin kodenya) ----------
-async function loadAiUsage(){
-  try {
-    const res = await fetch('/api/generate/info');
-    if (!res.ok) return;
-    const info = await res.json();
-    const hint = document.getElementById('aiUsageHint');
-    if (info.plan === 'pro') {
-      hint.textContent = 'Paket Pro — generate otomatis tanpa batas';
-    } else {
-      hint.textContent = 'Sisa generate otomatis gratis: ' + Math.max(0, info.limit - info.used) + ' / ' + info.limit;
-    }
-  } catch (e) { /* biarin, jangan blok halaman */ }
-}
-loadAiUsage();
 
-// ---------- Generate Otomatis (AI langsung bikin kodenya) ----------
+function hashCode(str){
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h) + str.charCodeAt(i);
+    h = h & h;
+  }
+  return 'p' + Math.abs(h).toString(36);
+}
+
 let currentGeneratedCode = '';
 let currentWorkspaces = [];
 
@@ -598,9 +603,15 @@ async function loadAiUsage(){
     const info = await res.json();
     const hint = document.getElementById('aiUsageHint');
     if (info.plan === 'pro') {
-      hint.textContent = 'Paket Pro — generate otomatis tanpa batas';
+      hint.textContent = 'Paket Pro — token AI tanpa batas';
     } else {
-      hint.textContent = 'Sisa generate otomatis gratis: ' + Math.max(0, info.limit - info.used) + ' / ' + info.limit;
+      const balance = Number(info.tokenBalance).toLocaleString('id-ID');
+      const total = Number(info.includedTokens).toLocaleString('id-ID');
+      hint.textContent = 'Sisa token AI: ' + balance + ' / ' + total;
+      if (Number(info.tokenBalance) <= 0) {
+        hint.style.color = '#ff9c9c';
+        hint.textContent += ' — habis! Minta top up ke admin atau upgrade ke Pro.';
+      }
     }
   } catch (e) { /* biarin, jangan blok halaman */ }
 }
@@ -633,6 +644,11 @@ async function runGenerate(){
   document.getElementById('copyBtn').style.display = 'none';
   document.getElementById('aiResultPane').style.display = 'none';
 
+  // Perkiraan target panjang kode (buat nentuin persentase), diambil dari pengalaman
+  // halaman lengkap biasanya sekitar 35.000-55.000 karakter. Ini cuma buat nentuin
+  // skala persen, bukan buat nebak-nebak selesainya — progress-nya sendiri dari data ASLI.
+  const ESTIMATED_TOTAL_CHARS = 45000;
+
   const steps = [
     'Membaca kebutuhan bisnis kamu...',
     'Merancang struktur halaman...',
@@ -641,7 +657,6 @@ async function runGenerate(){
     'Merapikan kode & fitur simpan-data...',
     'Hampir selesai, cek terakhir...'
   ];
-  let stepIndex = 0;
 
   document.getElementById('promptOutput').style.display = 'block';
   document.getElementById('promptOutput').innerHTML = `
@@ -649,6 +664,7 @@ async function runGenerate(){
       <div class="ai-loading-title">🤖 AI lagi bikin website kamu...</div>
       <div class="ai-loading-step" id="aiStepText">${steps[0]}</div>
       <div class="progress-track"><div class="progress-fill" id="aiProgressFill"></div></div>
+      <div class="ai-loading-step" id="aiCharCountText" style="color:var(--muted);margin-top:-14px;"></div>
       <div class="skeleton-block skel-hero"></div>
       <div class="skeleton-block skel-line w80"></div>
       <div class="skeleton-block skel-line w60"></div>
@@ -663,60 +679,45 @@ async function runGenerate(){
 
   const stepTextEl = document.getElementById('aiStepText');
   const progressFillEl = document.getElementById('aiProgressFill');
+  const charCountEl = document.getElementById('aiCharCountText');
 
-  const stepTimer = setInterval(() => {
-    stepIndex = Math.min(stepIndex + 1, steps.length - 1);
-    stepTextEl.textContent = steps[stepIndex];
-  }, 6000);
+  function updateProgressFromChars(charCount){
+    // Sebelum AI mulai ngirim teks (masih mikir), tetep kasih pergerakan kecil biar gak berasa macet
+    const pct = Math.min(95, Math.round((charCount / ESTIMATED_TOTAL_CHARS) * 100));
+    progressFillEl.style.width = Math.max(pct, 3) + '%';
+    charCountEl.textContent = charCount > 0 ? charCount.toLocaleString('id-ID') + ' karakter ditulis...' : '';
 
-  let progress = 0;
-  const progressTimer = setInterval(() => {
-    progress += (90 - progress) * 0.06;
-    progressFillEl.style.width = Math.min(progress, 90).toFixed(0) + '%';
-  }, 400);
-
-  function stopLoadingAnim(){
-    clearInterval(stepTimer);
-    clearInterval(progressTimer);
+    if (charCount === 0) stepTextEl.textContent = steps[0];
+    else if (charCount < ESTIMATED_TOTAL_CHARS * 0.2) stepTextEl.textContent = steps[1];
+    else if (charCount < ESTIMATED_TOTAL_CHARS * 0.4) stepTextEl.textContent = steps[2];
+    else if (charCount < ESTIMATED_TOTAL_CHARS * 0.6) stepTextEl.textContent = steps[3];
+    else if (charCount < ESTIMATED_TOTAL_CHARS * 0.85) stepTextEl.textContent = steps[4];
+    else stepTextEl.textContent = steps[5];
   }
+
+  // Sebelum ada data sama sekali (server masih nunggu AI mulai jawab), gerakin dikit-dikit
+  // biar keliatan hidup, tapi berhenti begitu data asli mulai masuk.
+  let preStartProgress = 0;
+  let receivedAnyData = false;
+  const preStartTimer = setInterval(() => {
+    if (receivedAnyData) { clearInterval(preStartTimer); return; }
+    preStartProgress = Math.min(preStartProgress + 1, 8);
+    progressFillEl.style.width = preStartProgress + '%';
+  }, 500);
+
   function resetToEmpty(){
+    clearInterval(preStartTimer);
     document.getElementById('promptOutput').innerHTML = '<div class="empty-state">Isi form di kiri, lalu klik "Generate Prompt".</div>';
     btn.disabled = false;
     btn.textContent = '🤖 Generate Otomatis (AI langsung bikin)';
   }
 
-  try {
-    const res = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
-    });
-    const data = await res.json();
-
-    if (res.status === 401) { window.location.href = '/login.html'; return; }
-
-    if (res.status === 402) {
-      stopLoadingAnim();
-      resetToEmpty();
-      if (confirm((data.error || 'Kuota generate otomatis sudah habis.') + '\n\nBuka halaman upgrade sekarang?')) {
-        window.location.href = '/billing.html';
-      }
-      return;
-    }
-
-    if (!res.ok) {
-      stopLoadingAnim();
-      resetToEmpty();
-      alert('Gagal generate.\n\nDetail: ' + (data.error || ('HTTP ' + res.status)));
-      return;
-    }
-
-    stopLoadingAnim();
+  function finishSuccess(code){
+    clearInterval(preStartTimer);
     progressFillEl.style.width = '100%';
     stepTextEl.textContent = 'Selesai!';
 
-    // Tampilkan hasilnya di panel preview, JANGAN langsung pindah halaman
-    currentGeneratedCode = data.code;
+    currentGeneratedCode = code;
     setTimeout(() => {
       document.getElementById('promptOutput').style.display = 'none';
       document.getElementById('aiResultPane').style.display = 'block';
@@ -725,14 +726,78 @@ async function runGenerate(){
       const bizName = document.getElementById('bizName').value.trim();
       document.getElementById('saveNameInput2').value = bizName || 'Project Baru';
       loadWorkspacesForSave();
+      loadSectionListForEdit();
       btn.disabled = false;
       btn.textContent = '🤖 Generate Otomatis (AI langsung bikin)';
       document.getElementById('resultStatus').textContent = 'Hasil AI siap direview & disimpan';
     }, 400);
 
     loadAiUsage();
+  }
+
+  try {
+    const res = await fetch('/api/generate-stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+
+    if (res.status === 401) { window.location.href = '/login.html'; return; }
+
+    if (res.status === 402) {
+      const data = await res.json().catch(() => ({}));
+      resetToEmpty();
+      if (confirm((data.error || 'Kuota generate otomatis sudah habis.') + '\n\nBuka halaman upgrade sekarang?')) {
+        window.location.href = '/billing.html';
+      }
+      return;
+    }
+
+    if (!res.ok || !res.body) {
+      const data = await res.json().catch(() => ({}));
+      resetToEmpty();
+      alert('Gagal generate.\n\nDetail: ' + (data.error || ('HTTP ' + res.status)));
+      return;
+    }
+
+    // Baca stream SSE dari server sedikit-sedikit, update progress dari data asli
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finished = false;
+
+    while (!finished) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith('data:')) continue;
+        let evt;
+        try { evt = JSON.parse(line.slice(5).trim()); } catch (e) { continue; }
+
+        if (evt.type === 'progress') {
+          receivedAnyData = true;
+          updateProgressFromChars(evt.charCount);
+        } else if (evt.type === 'done') {
+          finished = true;
+          finishSuccess(evt.code);
+        } else if (evt.type === 'error') {
+          finished = true;
+          resetToEmpty();
+          if (evt.error && evt.error.includes('Token AI kamu sudah habis')) {
+            if (confirm(evt.error + '\n\nBuka halaman upgrade sekarang?')) window.location.href = '/billing.html';
+          } else {
+            alert('Gagal generate.\n\nDetail: ' + evt.error);
+          }
+        }
+      }
+    }
   } catch (e) {
-    stopLoadingAnim();
     resetToEmpty();
     alert('Gagal generate.\n\nDetail: ' + e.message);
     loadAiUsage();
@@ -741,6 +806,96 @@ async function runGenerate(){
 
 document.getElementById('generateAiBtn').addEventListener('click', runGenerate);
 document.getElementById('regenerateBtn').addEventListener('click', runGenerate);
+
+// ---------- Edit Section pakai AI ----------
+function getPreviewWindow(){
+  const frame = document.getElementById('aiPreviewFrame');
+  return frame && frame.contentWindow;
+}
+
+function loadSectionListForEdit(attempt){
+  attempt = attempt || 0;
+  const select = document.getElementById('editSectionSelect');
+  const win = getPreviewWindow();
+
+  try {
+    if (win && typeof win.__getSiteData === 'function') {
+      const siteData = win.__getSiteData();
+      const sections = (siteData && siteData.sectionOrder) || (siteData && Object.keys(siteData.sections || {})) || [];
+      if (sections.length > 0) {
+        select.innerHTML = sections.map(s => '<option value="' + s + '">' + s + '</option>').join('');
+        return;
+      }
+    }
+  } catch (e) { /* iframe mungkin belum siap, coba lagi di bawah */ }
+
+  if (attempt < 15) {
+    setTimeout(() => loadSectionListForEdit(attempt + 1), 500);
+  } else {
+    select.innerHTML = '<option value="">Kode ini belum mendukung edit section (gak ada data-edit/getSiteData)</option>';
+  }
+}
+
+document.getElementById('editSectionBtn').addEventListener('click', async () => {
+  const sectionName = document.getElementById('editSectionSelect').value;
+  const instruction = document.getElementById('editInstructionInput').value.trim();
+  const resultBox = document.getElementById('editSectionResult');
+  const btn = document.getElementById('editSectionBtn');
+
+  if (!sectionName) { alert('Pilih section yang mau diedit dulu.'); return; }
+  if (!instruction) { alert('Isi dulu instruksi perubahannya.'); return; }
+
+  const win = getPreviewWindow();
+  if (!win || typeof win.__getSiteData !== 'function' || typeof win.__setSiteData !== 'function') {
+    alert('Kode ini belum mendukung edit section pakai AI.');
+    return;
+  }
+
+  const currentSiteData = win.__getSiteData();
+  const currentSectionData = currentSiteData.sections[sectionName];
+
+  btn.disabled = true;
+  btn.textContent = '⏳ AI lagi ngedit...';
+  resultBox.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/edit-section', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentData: currentSectionData, instruction })
+    });
+    const data = await res.json();
+
+    if (res.status === 402) {
+      if (confirm((data.error || 'Token AI habis.') + '\n\nBuka halaman upgrade sekarang?')) {
+        window.location.href = '/billing.html';
+      }
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || 'Gagal edit section');
+
+    // Terapkan hasil AI langsung ke preview yang lagi jalan (live update)
+    win.__setSiteData(prev => ({
+      ...prev,
+      sections: { ...prev.sections, [sectionName]: data.data }
+    }));
+
+    resultBox.style.display = 'block';
+    resultBox.style.background = '#0f2e29';
+    resultBox.style.color = '#a7f3e8';
+    resultBox.textContent = 'Section "' + sectionName + '" berhasil diupdate ✓ (langsung keliatan di preview)';
+    document.getElementById('editInstructionInput').value = '';
+    loadAiUsage();
+  } catch (e) {
+    resultBox.style.display = 'block';
+    resultBox.style.background = '#2a1010';
+    resultBox.style.color = '#ff9c9c';
+    resultBox.textContent = 'Gagal: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ Edit Section Ini';
+  }
+});
 
 document.getElementById('saveToWorkspaceBtn').addEventListener('click', async () => {
   const name = document.getElementById('saveNameInput2').value.trim() || 'Tanpa nama';
@@ -763,6 +918,21 @@ document.getElementById('saveToWorkspaceBtn').addEventListener('click', async ()
       return;
     }
     if (!res.ok) throw new Error(data.error || 'Gagal menyimpan');
+
+    // Simpan juga data yang lagi "hidup" di preview (termasuk kalau sempat diedit pakai AI/manual),
+    // biar pas dibuka di tool preview datanya gak balik ke default lagi.
+    try {
+      const win = getPreviewWindow();
+      if (win && typeof win.__getSiteData === 'function') {
+        const liveData = win.__getSiteData();
+        const projectId = hashCode(currentGeneratedCode.trim());
+        await fetch('/api/data/' + encodeURIComponent(projectId), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(liveData)
+        });
+      }
+    } catch (e) { /* gapapa, bukan fatal — paling data-nya balik ke default kode */ }
 
     resultBox.style.display = 'block';
     resultBox.style.background = '#0f2e29';

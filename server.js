@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');
 const { pool, migrate } = require('./lib/db');
 const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny, requireSuperAdmin, requireSuperAdminPage } = require('./lib/auth');
 const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
-const { generateHtmlFromPrompt, extractCode, stripStrayFences, getSetting, setSetting, getAiConfig, estimateCostUSD, PRICING, ANTHROPIC_MODELS } = require('./lib/ai');
+const { generateHtmlFromPrompt, generateHtmlFromPromptStream, extractCode, stripStrayFences, getSetting, setSetting, getAiConfig, estimateCostUSD, PRICING, ANTHROPIC_MODELS } = require('./lib/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,7 +34,7 @@ async function getOrg(orgId) {
 async function getPlanLimits(org) {
   const planName = isOrgPro(org) ? 'pro' : 'free';
   const r = await pool.query('SELECT * FROM plans WHERE name = $1', [planName]);
-  return r.rows[0] || { max_workspaces: 3, max_pages_per_workspace: 3, max_members_per_workspace: 2, max_ai_generations: 3 };
+  return r.rows[0] || { max_workspaces: 3, max_pages_per_workspace: 3, max_members_per_workspace: 2, max_ai_generations: 3, included_tokens: 50000 };
 }
 
 // ---------------------------------------------------------------------------
@@ -110,9 +110,11 @@ app.post('/api/auth/register', async (req, res) => {
   if (existing.rows[0]) return res.status(409).json({ error: 'Email sudah terdaftar' });
 
   const orgId = genId('org');
+  const freePlan = await pool.query('SELECT included_tokens FROM plans WHERE name = $1', ['free']);
+  const initialTokens = freePlan.rows[0] ? freePlan.rows[0].included_tokens : 50000;
   await pool.query(
-    'INSERT INTO orgs (id, name, plan, subscription_expires_at, created_at) VALUES ($1,$2,$3,$4,$5)',
-    [orgId, orgName, 'free', null, Date.now()]
+    'INSERT INTO orgs (id, name, plan, subscription_expires_at, created_at, token_balance) VALUES ($1,$2,$3,$4,$5,$6)',
+    [orgId, orgName, 'free', null, Date.now(), initialTokens]
   );
 
   const userId = genId('user');
@@ -457,8 +459,11 @@ app.get('/api/generate/info', requireAuth, async (req, res) => {
   const org = await getOrg(req.user.orgId);
   const limits = await getPlanLimits(org);
   res.json({
-    used: org ? org.ai_generations_used : 0,
-    limit: limits.max_ai_generations,
+    tokenBalance: org ? Number(org.token_balance) : 0,
+    includedTokens: limits.included_tokens,
+    inputTokensUsed: org ? Number(org.ai_input_tokens_used) : 0,
+    outputTokensUsed: org ? Number(org.ai_output_tokens_used) : 0,
+    generationsUsed: org ? org.ai_generations_used : 0,
     plan: isOrgPro(org) ? 'pro' : 'free'
   });
 });
@@ -468,10 +473,9 @@ app.post('/api/generate', requireAuth, async (req, res) => {
   if (!prompt || !prompt.trim()) return res.status(400).json({ error: 'Prompt kosong' });
 
   const org = await getOrg(req.user.orgId);
-  const limits = await getPlanLimits(org);
-  if (org.ai_generations_used >= limits.max_ai_generations) {
+  if (!isOrgPro(org) && Number(org.token_balance) <= 0) {
     return res.status(402).json({
-      error: 'Paket kamu cuma bisa generate otomatis ' + limits.max_ai_generations + ' kali. Upgrade ke Pro buat generate lebih banyak.',
+      error: 'Token AI kamu sudah habis. Minta tambahan token ke admin platform, atau upgrade ke Pro buat token tanpa batas.',
       upgradeRequired: true
     });
   }
@@ -486,15 +490,120 @@ app.post('/api/generate', requireAuth, async (req, res) => {
       });
     }
 
+    const tokensUsed = usage.inputTokens + usage.outputTokens;
     await pool.query(
       `UPDATE orgs SET
         ai_generations_used = ai_generations_used + 1,
         ai_input_tokens_used = ai_input_tokens_used + $2,
-        ai_output_tokens_used = ai_output_tokens_used + $3
+        ai_output_tokens_used = ai_output_tokens_used + $3,
+        token_balance = GREATEST(token_balance - $4, 0)
        WHERE id = $1`,
-      [req.user.orgId, usage.inputTokens, usage.outputTokens]
+      [req.user.orgId, usage.inputTokens, usage.outputTokens, tokensUsed]
     );
     res.json({ ok: true, code });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Versi streaming dari /api/generate — AI ngirim hasil sedikit-sedikit,
+// jadi progress bar di frontend bisa ngikutin progress ASLI (bukan animasi kira-kira).
+app.post('/api/generate-stream', requireAuth, async (req, res) => {
+  const { prompt } = req.body || {};
+  if (!prompt || !prompt.trim()) return res.status(400).json({ error: 'Prompt kosong' });
+
+  const org = await getOrg(req.user.orgId);
+  if (!isOrgPro(org) && Number(org.token_balance) <= 0) {
+    return res.status(402).json({
+      error: 'Token AI kamu sudah habis. Minta tambahan token ke admin platform, atau upgrade ke Pro buat token tanpa batas.',
+      upgradeRequired: true
+    });
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  const send = (obj) => res.write('data: ' + JSON.stringify(obj) + '\n\n');
+
+  try {
+    const { text: rawText, usage } = await generateHtmlFromPromptStream(prompt, (charCount) => {
+      send({ type: 'progress', charCount });
+    });
+    const code = stripStrayFences(extractCode(rawText));
+
+    if (!code || code.length < 20) {
+      send({ type: 'error', error: 'AI mengembalikan hasil yang kosong/gak lengkap. Coba generate ulang, atau coba ganti model AI di Panel Superadmin.' });
+      return res.end();
+    }
+
+    const tokensUsed = usage.inputTokens + usage.outputTokens;
+    await pool.query(
+      `UPDATE orgs SET
+        ai_generations_used = ai_generations_used + 1,
+        ai_input_tokens_used = ai_input_tokens_used + $2,
+        ai_output_tokens_used = ai_output_tokens_used + $3,
+        token_balance = GREATEST(token_balance - $4, 0)
+       WHERE id = $1`,
+      [req.user.orgId, usage.inputTokens, usage.outputTokens, tokensUsed]
+    );
+
+    send({ type: 'done', code });
+    res.end();
+  } catch (e) {
+    send({ type: 'error', error: e.message });
+    res.end();
+  }
+});
+
+
+app.post('/api/edit-section', requireAuth, async (req, res) => {
+  const { currentData, instruction } = req.body || {};
+  if (!currentData) return res.status(400).json({ error: 'Data section kosong' });
+  if (!instruction || !instruction.trim()) return res.status(400).json({ error: 'Isi dulu instruksi perubahannya' });
+
+  const org = await getOrg(req.user.orgId);
+  if (!isOrgPro(org) && Number(org.token_balance) <= 0) {
+    return res.status(402).json({
+      error: 'Token AI kamu sudah habis. Minta tambahan token ke admin platform, atau upgrade ke Pro buat token tanpa batas.',
+      upgradeRequired: true
+    });
+  }
+
+  const editPrompt =
+    'Ini data JSON sebuah website (struktur siteData React):\n\n' +
+    '```json\n' + JSON.stringify(currentData, null, 2) + '\n```\n\n' +
+    'Tolong ubah data di atas sesuai instruksi berikut: "' + instruction.trim() + '"\n\n' +
+    'ATURAN WAJIB:\n' +
+    '- Balikin HANYA JSON hasil yang sudah diupdate, jangan ada penjelasan/teks lain di luar JSON.\n' +
+    '- JANGAN mengubah struktur/nama field yang sudah ada (jangan tambah/hapus field).\n' +
+    '- Field yang gak disebut di instruksi, biarkan nilainya sama persis seperti semula.\n' +
+    '- Untuk field gambar (biasanya namanya mengandung kata "image" atau "logo"), JANGAN diubah nilainya sama sekali kecuali diminta secara eksplisit.';
+
+  try {
+    const { text: rawText, usage } = await generateHtmlFromPrompt(editPrompt);
+    let cleaned = stripStrayFences(extractCode(rawText));
+
+    let updatedData;
+    try {
+      updatedData = JSON.parse(cleaned);
+    } catch (e) {
+      return res.status(500).json({ error: 'AI membalas dengan format yang gak valid. Coba instruksi yang lebih spesifik, atau coba lagi.' });
+    }
+
+    const tokensUsed = usage.inputTokens + usage.outputTokens;
+    await pool.query(
+      `UPDATE orgs SET
+        ai_input_tokens_used = ai_input_tokens_used + $2,
+        ai_output_tokens_used = ai_output_tokens_used + $3,
+        token_balance = GREATEST(token_balance - $4, 0)
+       WHERE id = $1`,
+      [req.user.orgId, usage.inputTokens, usage.outputTokens, tokensUsed]
+    );
+
+    res.json({ ok: true, data: updatedData });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -567,7 +676,7 @@ app.get('/api/superadmin/stats', requireAuth, requireSuperAdmin, async (req, res
   const orgList = await pool.query(`
     SELECT
       o.id, o.name, o.plan, o.subscription_expires_at AS "subscriptionExpiresAt", o.created_at AS "createdAt",
-      o.ai_generations_used AS "aiGenerationsUsed",
+      o.ai_generations_used AS "aiGenerationsUsed", o.token_balance AS "tokenBalance",
       o.ai_input_tokens_used AS "aiInputTokens", o.ai_output_tokens_used AS "aiOutputTokens",
       (SELECT COUNT(*)::int FROM users u WHERE u.org_id = o.id) AS "userCount",
       (SELECT COUNT(*)::int FROM workspaces w WHERE w.org_id = o.id) AS "workspaceCount",
@@ -597,6 +706,7 @@ app.get('/api/superadmin/stats', requireAuth, requireSuperAdmin, async (req, res
     },
     orgs: orgList.rows.map((o) => ({
       ...o,
+      tokenBalance: Number(o.tokenBalance),
       plan: (o.plan === 'pro' && o.subscriptionExpiresAt && Number(o.subscriptionExpiresAt) > Date.now()) ? 'pro' : 'free'
     }))
   });
@@ -609,23 +719,39 @@ app.get('/api/superadmin/plans', requireAuth, requireSuperAdmin, async (req, res
     maxWorkspaces: p.max_workspaces,
     maxPagesPerWorkspace: p.max_pages_per_workspace,
     maxMembersPerWorkspace: p.max_members_per_workspace,
-    maxAiGenerations: p.max_ai_generations
+    maxAiGenerations: p.max_ai_generations,
+    includedTokens: Number(p.included_tokens)
   })));
 });
 
 app.post('/api/superadmin/plans/:name', requireAuth, requireSuperAdmin, async (req, res) => {
-  const { maxWorkspaces, maxPagesPerWorkspace, maxMembersPerWorkspace, maxAiGenerations } = req.body || {};
+  const { maxWorkspaces, maxPagesPerWorkspace, maxMembersPerWorkspace, maxAiGenerations, includedTokens } = req.body || {};
   const r = await pool.query(
     `UPDATE plans SET
       max_workspaces = $2,
       max_pages_per_workspace = $3,
       max_members_per_workspace = $4,
-      max_ai_generations = $5
+      max_ai_generations = $5,
+      included_tokens = $6
      WHERE name = $1`,
-    [req.params.name, maxWorkspaces, maxPagesPerWorkspace, maxMembersPerWorkspace, maxAiGenerations]
+    [req.params.name, maxWorkspaces, maxPagesPerWorkspace, maxMembersPerWorkspace, maxAiGenerations, includedTokens]
   );
   if (r.rowCount === 0) return res.status(404).json({ error: 'Paket tidak ditemukan' });
   res.json({ ok: true });
+});
+
+// Top-up token buat tim tertentu (manual sama superadmin, misal abis dibayar di luar sistem)
+app.post('/api/superadmin/orgs/:id/topup', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { amount } = req.body || {};
+  const amt = parseInt(amount, 10);
+  if (!amt || amt <= 0) return res.status(400).json({ error: 'Jumlah token harus lebih dari 0' });
+
+  const r = await pool.query(
+    'UPDATE orgs SET token_balance = token_balance + $2 WHERE id = $1 RETURNING token_balance',
+    [req.params.id, amt]
+  );
+  if (r.rowCount === 0) return res.status(404).json({ error: 'Tim tidak ditemukan' });
+  res.json({ ok: true, newBalance: Number(r.rows[0].token_balance) });
 });
 
 app.get('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {

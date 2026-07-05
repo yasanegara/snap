@@ -133,11 +133,13 @@
         <th>Publish</th>
         <th>AI Generate</th>
         <th>Token In/Out</th>
+        <th>Saldo Token</th>
+        <th>Top Up</th>
         <th>Terdaftar</th>
       </tr>
     </thead>
     <tbody id="orgTableBody">
-      <tr><td colspan="9" class="loading">Memuat...</td></tr>
+      <tr><td colspan="11" class="loading">Memuat...</td></tr>
     </tbody>
   </table>
 </div>
@@ -183,7 +185,7 @@ function renderCards(s){
 function renderTable(orgs){
   const tbody = document.getElementById('orgTableBody');
   if (orgs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="loading">Belum ada tim.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="loading">Belum ada tim.</td></tr>';
     return;
   }
   tbody.innerHTML = orgs.map(o => {
@@ -197,9 +199,35 @@ function renderTable(orgs){
       '<td>' + o.publishCount + '</td>' +
       '<td>' + o.aiGenerationsUsed + '</td>' +
       '<td>' + Number(o.aiInputTokens).toLocaleString('id-ID') + ' / ' + Number(o.aiOutputTokens).toLocaleString('id-ID') + '</td>' +
+      '<td>' + Number(o.tokenBalance).toLocaleString('id-ID') + '</td>' +
+      '<td><button class="btn-save topup-btn" data-org="' + o.id + '" data-name="' + escapeHtml(o.name) + '" style="padding:5px 10px;font-size:11.5px;">+ Top Up</button></td>' +
       '<td>' + date + '</td>' +
       '</tr>';
   }).join('');
+
+  tbody.querySelectorAll('.topup-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const orgId = btn.dataset.org;
+      const orgName = btn.dataset.name;
+      const amountStr = prompt('Mau nambah berapa token buat tim "' + orgName + '"?\n\n(Contoh: 50000)');
+      if (!amountStr) return;
+      const amount = parseInt(amountStr, 10);
+      if (!amount || amount <= 0) { alert('Isi angka yang valid ya.'); return; }
+      try {
+        const res = await fetch('/api/superadmin/orgs/' + orgId + '/topup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Gagal top up');
+        alert('Berhasil! Saldo token "' + orgName + '" sekarang: ' + Number(data.newBalance).toLocaleString('id-ID'));
+        loadStats();
+      } catch (e) {
+        alert('Gagal top up: ' + e.message);
+      }
+    });
+  });
 }
 
 function escapeHtml(s){
@@ -227,6 +255,7 @@ async function loadPlans(){
         <div class="plan-field"><label>Max Halaman/Workspace</label><input type="number" min="0" class="f-pages" value="${p.maxPagesPerWorkspace}" /></div>
         <div class="plan-field"><label>Max Member/Workspace</label><input type="number" min="0" class="f-members" value="${p.maxMembersPerWorkspace}" /></div>
         <div class="plan-field"><label>Max AI Generate</label><input type="number" min="0" class="f-ai" value="${p.maxAiGenerations}" /></div>
+        <div class="plan-field"><label>Kuota Token Awal</label><input type="number" min="0" class="f-tokens" value="${p.includedTokens}" style="width:130px;" /></div>
         <button class="btn-save save-plan-btn" style="align-self:flex-end;">Simpan</button>
         <span class="plan-save-status" style="font-size:12px;color:var(--muted);align-self:flex-end;"></span>
       </div>
@@ -246,7 +275,8 @@ async function loadPlans(){
               maxWorkspaces: parseInt(row.querySelector('.f-workspaces').value, 10),
               maxPagesPerWorkspace: parseInt(row.querySelector('.f-pages').value, 10),
               maxMembersPerWorkspace: parseInt(row.querySelector('.f-members').value, 10),
-              maxAiGenerations: parseInt(row.querySelector('.f-ai').value, 10)
+              maxAiGenerations: parseInt(row.querySelector('.f-ai').value, 10),
+              includedTokens: parseInt(row.querySelector('.f-tokens').value, 10)
             })
           });
           if (!res.ok) throw new Error('Gagal menyimpan');
