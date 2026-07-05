@@ -1042,8 +1042,8 @@ function buildReactDoc(code, options){
 
   const dataEndpointBase = options.dataEndpointBase || '/api/data/';
   const dataKey = options.dataKey || hashCode(code.trim());
-  const enableEditOverlay = true; // sekarang aktif juga di halaman yang sudah live/publish
-  const aiEditEndpoint = dataEndpointBase === '/api/data/' ? '/api/edit-section' : ('/api/public-edit-section/' + encodeURIComponent(dataKey));
+  const enableEditOverlay = dataEndpointBase === '/api/data/'; // cuma aktif di preview, gak di halaman live/publish
+  const aiEditEndpoint = dataEndpointBase === '/api/data/' ? '/api/edit-section' : null; // null = mati di halaman live/publish
   const combined = RUNNER_SHIMS_SRC + '\n' + transformed + '\n' + mountCode + '\n' + EDIT_OVERLAY_SRC + '\n' + AI_SECTION_EDIT_SRC;
   const combinedEscaped = JSON.stringify(combined);
 
@@ -1117,8 +1117,8 @@ function buildHtmlDoc(code, options){
   options = options || {};
   const dataEndpointBase = options.dataEndpointBase || '/api/data/';
   const dataKey = options.dataKey || hashCode(code.trim());
-  const enableEditOverlay = true; // sekarang aktif juga di halaman yang sudah live/publish
-  const aiEditEndpoint = dataEndpointBase === '/api/data/' ? '/api/edit-section' : ('/api/public-edit-section/' + encodeURIComponent(dataKey));
+  const enableEditOverlay = dataEndpointBase === '/api/data/'; // cuma aktif di preview, gak di halaman live/publish
+  const aiEditEndpoint = dataEndpointBase === '/api/data/' ? '/api/edit-section' : null; // null = mati di halaman live/publish
   const bridgeTag = `<script>
     window.__projectId = ${JSON.stringify(dataKey)};
     window.__dataEndpointBase = ${JSON.stringify(dataEndpointBase)};
