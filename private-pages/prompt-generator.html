@@ -708,7 +708,7 @@ function buildPromptText(){
 'Setiap elemen <section> (atau pembungkus utama tiap section) WAJIB dikasih atribut `id` yang SAMA PERSIS dengan namanya di `sectionOrder`. Contoh: kalau di sectionOrder ada "hero", maka wajib ada `<section id="hero">...</section>`. Ini WAJIB ada di SEMUA section tanpa kecuali (termasuk hero, about, contact, dll), soalnya platform butuh ini buat nyediain tombol "Edit dengan AI" otomatis di tiap section. Kalau id-nya beda/gak ada, tombol itu gak akan muncul.\n\n' +
 '3. KOMPONEN App HARUS PAKAI STATE INI (SALIN PERSIS, JANGAN DIUBAH LOGIKANYA):\n\n' +
 '```jsx\n' + contractHooks + '\n```\n\n' +
-'Taruh kode di atas di paling awal komponen `App`, sebelum logic lainnya. Tampilkan juga indikator kecil di panel admin: tampilkan teks "Menyimpan..." kalau saveStatus === "saving", "Tersimpan ✓" kalau "saved", "Gagal menyimpan" kalau "error".\n\n' +
+'Taruh kode di atas di paling awal komponen `App`, sebelum logic lainnya. `saveStatus` ini CUKUP disimpan sebagai state internal, JANGAN ditampilkan di mana pun di halaman (jangan bikin teks/badge "Tersimpan"/"Menyimpan..." yang keliatan pengunjung) — platform ini udah nyediain notifikasi simpan sendiri lewat fitur klik-edit-nya.\n\n' +
 '4. UPLOAD FOTO HARUS PAKAI POLA INI (SALIN PERSIS):\n\n' +
 '```jsx\n' + contractUploader + '\n```\n\n' +
 'JANGAN PERNAH pakai `URL.createObjectURL(file)` untuk foto yang mau disimpan permanen — itu cuma sementara dan akan hilang saat refresh.\n\n' +
