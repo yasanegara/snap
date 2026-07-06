@@ -668,299 +668,8 @@ window.__genericShim = function(name){
 `;
 
 // ---------- Mode Edit: klik-langsung buat orang awam (cuma jalan di preview tool, bukan halaman publik) ----------
-const EDIT_OVERLAY_SRC = `
-(function(){
-  if (!window.__ENABLE_EDIT_OVERLAY) return;
-
-  function initEditOverlay(){
-  var editModeOn = false;
-
-  var toggleBtn = document.createElement('button');
-  toggleBtn.textContent = '🖊️ Mode Edit: OFF';
-  toggleBtn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:999999;background:#111;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-size:13px;cursor:pointer;font-family:-apple-system,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.35);';
-  document.body.appendChild(toggleBtn);
-
-  var styleTag = document.createElement('style');
-  styleTag.textContent = '.__edit-hover{outline:2px dashed #5eead4 !important;outline-offset:2px;cursor:pointer !important;}';
-  document.head.appendChild(styleTag);
-
-  toggleBtn.addEventListener('click', function(){
-    editModeOn = !editModeOn;
-    toggleBtn.textContent = editModeOn ? '🖊️ Mode Edit: ON' : '🖊️ Mode Edit: OFF';
-    if (!editModeOn) {
-      var pop = document.getElementById('__edit-popover');
-      if (pop) pop.remove();
-    }
-  });
-
-  function getByPath(obj, path){
-    return path.split('.').reduce(function(o,k){ return (o == null) ? undefined : o[k]; }, obj);
-  }
-  function setByPath(obj, path, value){
-    var keys = path.split('.');
-    var clone = JSON.parse(JSON.stringify(obj));
-    var cur = clone;
-    for (var i = 0; i < keys.length - 1; i++){ cur = cur[keys[i]]; }
-    cur[keys[keys.length - 1]] = value;
-    return clone;
-  }
-
-  document.addEventListener('mouseover', function(e){
-    if (!editModeOn) return;
-    var el = e.target.closest && e.target.closest('[data-edit]');
-    if (el) el.classList.add('__edit-hover');
-  });
-  document.addEventListener('mouseout', function(e){
-    var el = e.target.closest && e.target.closest('[data-edit]');
-    if (el) el.classList.remove('__edit-hover');
-  });
-
-  document.addEventListener('click', function(e){
-    if (!editModeOn) return;
-    var el = e.target.closest && e.target.closest('[data-edit]');
-    if (!el) return;
-    e.preventDefault(); e.stopPropagation();
-    openEditPopover(el);
-  }, true);
-
-  function openEditPopover(el){
-    var path = el.getAttribute('data-edit');
-    var type = el.getAttribute('data-edit-type') || 'text';
-
-    if (!window.__getSiteData || !window.__setSiteData) {
-      alert('Kode ini belum mendukung Mode Edit klik-langsung (belum ada data-edit / __getSiteData).');
-      return;
-    }
-
-    var existing = document.getElementById('__edit-popover');
-    if (existing) existing.remove();
-
-    var currentValue = getByPath(window.__getSiteData(), path);
-    var rect = el.getBoundingClientRect();
-
-    var pop = document.createElement('div');
-    pop.id = '__edit-popover';
-    var top = Math.min(rect.bottom + 8, window.innerHeight - 200);
-    var left = Math.min(Math.max(rect.left, 8), window.innerWidth - 300);
-    pop.style.cssText = 'position:fixed;z-index:1000000;background:#fff;border:1px solid #ccc;border-radius:10px;padding:14px;' +
-      'box-shadow:0 6px 20px rgba(0,0,0,.3);font-family:-apple-system,sans-serif;width:280px;top:' + top + 'px;left:' + left + 'px;';
-
-    var label = document.createElement('div');
-    label.textContent = 'Edit: ' + path;
-    label.style.cssText = 'font-size:11px;color:#666;margin-bottom:8px;font-weight:600;word-break:break-all;';
-    pop.appendChild(label);
-
-    var input;
-    if (type === 'image') {
-      var preview = document.createElement('img');
-      preview.src = currentValue || '';
-      preview.style.cssText = 'width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-bottom:8px;background:#eee;';
-      pop.appendChild(preview);
-      input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.style.cssText = 'width:100%;font-size:12px;margin-bottom:8px;';
-    } else if (type === 'textarea') {
-      input = document.createElement('textarea');
-      input.value = currentValue || '';
-      input.style.cssText = 'width:100%;min-height:70px;padding:7px;border:1px solid #ccc;border-radius:6px;font-size:13px;margin-bottom:10px;font-family:inherit;';
-    } else {
-      input = document.createElement('input');
-      input.type = 'text';
-      input.value = currentValue || '';
-      input.style.cssText = 'width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;font-size:13px;margin-bottom:10px;';
-    }
-    pop.appendChild(input);
-
-    var btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
-
-    var cancelBtn = document.createElement('button');
-    cancelBtn.textContent = 'Batal';
-    cancelBtn.style.cssText = 'padding:7px 12px;border:1px solid #ccc;background:#fff;border-radius:6px;font-size:12.5px;cursor:pointer;';
-    cancelBtn.onclick = function(){ pop.remove(); };
-
-    var saveBtn = document.createElement('button');
-    saveBtn.textContent = 'Simpan';
-    saveBtn.style.cssText = 'padding:7px 14px;border:none;background:#0f766e;color:#fff;border-radius:6px;font-size:12.5px;cursor:pointer;font-weight:600;';
-    saveBtn.onclick = function(){
-      if (type === 'image') {
-        var file = input.files && input.files[0];
-        if (!file) { pop.remove(); return; }
-        var reader = new FileReader();
-        reader.onloadend = function(){
-          window.__setSiteData(function(prev){ return setByPath(prev, path, reader.result); });
-          pop.remove();
-        };
-        reader.readAsDataURL(file);
-      } else {
-        window.__setSiteData(function(prev){ return setByPath(prev, path, input.value); });
-        pop.remove();
-      }
-    };
-
-    btnRow.appendChild(cancelBtn);
-    btnRow.appendChild(saveBtn);
-    pop.appendChild(btnRow);
-    document.body.appendChild(pop);
-  }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initEditOverlay);
-  } else {
-    initEditOverlay();
-  }
-})();
-`;
-
-// ---------- Edit per-section pakai AI: nempel tombol langsung di tiap section ----------
-// window.__aiEditEndpoint harus di-set sebelum skrip ini jalan (beda alamat buat preview vs publish)
-const AI_SECTION_EDIT_SRC = `
-(function(){
-  if (!window.__aiEditEndpoint) return;
-
-  function attachButtons(){
-    if (!window.__getSiteData || !window.__setSiteData) return false;
-    var siteData = window.__getSiteData();
-    var sectionOrder = (siteData && siteData.sectionOrder) || (siteData && Object.keys(siteData.sections || {})) || [];
-    var found = false;
-
-    sectionOrder.forEach(function(sectionName){
-      var el = document.getElementById(sectionName);
-      if (!el || el.dataset.__aiEditAttached) return;
-      found = true;
-      el.dataset.__aiEditAttached = '1';
-
-      var computed = window.getComputedStyle(el);
-      if (computed.position === 'static') el.style.position = 'relative';
-
-      var btn = document.createElement('button');
-      btn.textContent = '✨ Edit dengan AI';
-      btn.style.cssText = 'position:absolute;top:10px;right:10px;z-index:99998;background:#7C3AED;color:#fff;border:none;padding:7px 14px;border-radius:20px;font-size:11.5px;cursor:pointer;font-family:-apple-system,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.3);opacity:0;transition:opacity .2s;';
-      el.appendChild(btn);
-
-      el.addEventListener('mouseenter', function(){ btn.style.opacity = '1'; });
-      el.addEventListener('mouseleave', function(){ if (btn.dataset.active !== '1') btn.style.opacity = '0'; });
-
-      btn.addEventListener('click', function(e){
-        e.preventDefault(); e.stopPropagation();
-        openPopover(sectionName, btn);
-      });
-    });
-    return found;
-  }
-
-  function openPopover(sectionName, anchorBtn){
-    var existing = document.getElementById('__ai-section-popover');
-    if (existing) existing.remove();
-    document.querySelectorAll('[data-active="1"]').forEach(function(b){ b.dataset.active = '0'; });
-    anchorBtn.dataset.active = '1';
-    anchorBtn.style.opacity = '1';
-
-    var rect = anchorBtn.getBoundingClientRect();
-    var pop = document.createElement('div');
-    pop.id = '__ai-section-popover';
-    var top = Math.min(rect.bottom + 8, window.innerHeight - 210);
-    var left = Math.min(Math.max(rect.right - 300, 8), window.innerWidth - 310);
-    pop.style.cssText = 'position:fixed;z-index:100000;background:#fff;border:1px solid #ddd;border-radius:12px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.3);font-family:-apple-system,sans-serif;width:290px;top:' + top + 'px;left:' + left + 'px;';
-
-    var label = document.createElement('div');
-    label.textContent = '✨ Edit section: ' + sectionName;
-    label.style.cssText = 'font-size:12.5px;font-weight:700;margin-bottom:8px;color:#222;';
-    pop.appendChild(label);
-
-    var textarea = document.createElement('textarea');
-    textarea.placeholder = 'Contoh: buat judulnya lebih menarik buat anak muda';
-    textarea.style.cssText = 'width:100%;min-height:64px;padding:8px;border:1px solid #ccc;border-radius:7px;font-size:12.5px;margin-bottom:10px;font-family:inherit;box-sizing:border-box;';
-    pop.appendChild(textarea);
-
-    var statusDiv = document.createElement('div');
-    statusDiv.style.cssText = 'font-size:11.5px;margin-bottom:8px;display:none;';
-    pop.appendChild(statusDiv);
-
-    var btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
-
-    var cancelBtn = document.createElement('button');
-    cancelBtn.textContent = 'Batal';
-    cancelBtn.style.cssText = 'padding:7px 12px;border:1px solid #ccc;background:#fff;border-radius:7px;font-size:12px;cursor:pointer;';
-    cancelBtn.onclick = function(){ anchorBtn.dataset.active = '0'; pop.remove(); };
-
-    var sendBtn = document.createElement('button');
-    sendBtn.textContent = 'Kirim ke AI';
-    sendBtn.style.cssText = 'padding:7px 14px;border:none;background:#7C3AED;color:#fff;border-radius:7px;font-size:12px;cursor:pointer;font-weight:700;';
-    sendBtn.onclick = function(){
-      var instruction = textarea.value.trim();
-      if (!instruction) { alert('Isi dulu instruksinya.'); return; }
-      sendBtn.disabled = true;
-      cancelBtn.disabled = true;
-      sendBtn.textContent = '⏳ AI mikir...';
-      statusDiv.style.display = 'block';
-      statusDiv.style.color = '#666';
-      statusDiv.textContent = 'Menunggu AI...';
-
-      var currentSiteData = window.__getSiteData();
-      var currentSectionData = currentSiteData.sections[sectionName];
-
-      fetch(window.__aiEditEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentData: currentSectionData, instruction: instruction })
-      }).then(function(r){
-        return r.json().then(function(data){ return { status: r.status, ok: r.ok, data: data }; });
-      }).then(function(result){
-        if (result.status === 402) {
-          statusDiv.style.color = '#c00';
-          statusDiv.textContent = result.data.error || 'Token AI habis.';
-          sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
-          return;
-        }
-        if (!result.ok) {
-          statusDiv.style.color = '#c00';
-          statusDiv.textContent = 'Gagal: ' + (result.data.error || 'error tidak diketahui');
-          sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
-          return;
-        }
-        window.__setSiteData(function(prev){
-          var next = JSON.parse(JSON.stringify(prev));
-          next.sections[sectionName] = result.data.data;
-          return next;
-        });
-        statusDiv.style.color = '#0a7a4a';
-        statusDiv.textContent = 'Berhasil diupdate ✓';
-        setTimeout(function(){ anchorBtn.dataset.active = '0'; pop.remove(); }, 1000);
-      }).catch(function(e){
-        statusDiv.style.color = '#c00';
-        statusDiv.textContent = 'Gagal: ' + e.message;
-        sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
-      });
-    };
-
-    btnRow.appendChild(cancelBtn);
-    btnRow.appendChild(sendBtn);
-    pop.appendChild(btnRow);
-    document.body.appendChild(pop);
-    textarea.focus();
-  }
-
-  function init(attempt){
-    attempt = attempt || 0;
-    var ok = attachButtons();
-    if (!ok && attempt < 15) {
-      setTimeout(function(){ init(attempt + 1); }, 500);
-    } else {
-      setInterval(attachButtons, 2000);
-    }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function(){ setTimeout(init, 300); });
-  } else {
-    setTimeout(init, 300);
-  }
-})();
-`;
+// Skrip Mode Edit (manual) + Edit dengan AI sekarang jadi 1 file bareng: /overlay-editor.js
+// (dipakai juga sama halaman prompt-generator.html, biar gak ada kode yang keduplikat)
 
 // ---------- Ubah "import ... from '...';" jadi ambil dari shim global (tanpa internet) ----------
 function moduleToGlobalExpr(name){
@@ -1044,7 +753,7 @@ function buildReactDoc(code, options){
   const dataKey = options.dataKey || hashCode(code.trim());
   const enableEditOverlay = dataEndpointBase === '/api/data/'; // cuma aktif di preview, gak di halaman live/publish
   const aiEditEndpoint = dataEndpointBase === '/api/data/' ? '/api/edit-section' : null; // null = mati di halaman live/publish
-  const combined = RUNNER_SHIMS_SRC + '\n' + transformed + '\n' + mountCode + '\n' + EDIT_OVERLAY_SRC + '\n' + AI_SECTION_EDIT_SRC;
+  const combined = RUNNER_SHIMS_SRC + '\n' + transformed + '\n' + mountCode;
   const combinedEscaped = JSON.stringify(combined);
 
   const bootScript = `
@@ -1108,6 +817,7 @@ function buildReactDoc(code, options){
   });
 ${bootScript}
 <\/script>
+<script src="/overlay-editor.js"><\/script>
 </body>
 </html>`;
 }
@@ -1126,8 +836,7 @@ function buildHtmlDoc(code, options){
     window.__ENABLE_EDIT_OVERLAY = ${JSON.stringify(enableEditOverlay)};
     window.__aiEditEndpoint = ${JSON.stringify(aiEditEndpoint)};
   <\/script>
-  <script>${EDIT_OVERLAY_SRC}<\/script>
-  <script>${AI_SECTION_EDIT_SRC}<\/script>`;
+  <script src="/overlay-editor.js"><\/script>`;
 
   const hasTailwind = /tailwindcss/i.test(code) || /cdn\.tailwindcss/i.test(code);
   const tailwindTag = hasTailwind ? '' : '<script src="https://cdn.tailwindcss.com"><\/script>';
