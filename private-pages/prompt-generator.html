@@ -354,17 +354,6 @@
   window.__setSiteData = setSiteData;
 </script>
 
-<script type="text/plain" id="contractUploader">
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => onImageChange(reader.result); // WAJIB base64, JANGAN URL.createObjectURL
-      reader.readAsDataURL(file);
-    }
-  };
-</script>
-
 <script>
 // ---------- Section yang bisa di-setup detailnya kalau aktif ----------
 // listConfig: kalau section punya ini, dia dapat form daftar item (bukan cuma teks bebas)
@@ -610,7 +599,6 @@ function buildPromptText(){
   const logoFallback = document.getElementById('logoFallbackText').value.trim();
 
   const contractHooks = document.getElementById('contractHooks').textContent.trim();
-  const contractUploader = document.getElementById('contractUploader').textContent.trim();
 
   const sectionList = sections.length ? sections.map(s => {
     let line = '- ' + s.val + ' — Upload foto: ' + (s.foto ? 'Ya' : 'Tidak');
@@ -709,9 +697,8 @@ function buildPromptText(){
 '3. KOMPONEN App HARUS PAKAI STATE INI (SALIN PERSIS, JANGAN DIUBAH LOGIKANYA):\n\n' +
 '```jsx\n' + contractHooks + '\n```\n\n' +
 'Taruh kode di atas di paling awal komponen `App`, sebelum logic lainnya. `saveStatus` ini CUKUP disimpan sebagai state internal, JANGAN ditampilkan di mana pun di halaman (jangan bikin teks/badge "Tersimpan"/"Menyimpan..." yang keliatan pengunjung) — platform ini udah nyediain notifikasi simpan sendiri lewat fitur klik-edit-nya.\n\n' +
-'4. UPLOAD FOTO HARUS PAKAI POLA INI (SALIN PERSIS):\n\n' +
-'```jsx\n' + contractUploader + '\n```\n\n' +
-'JANGAN PERNAH pakai `URL.createObjectURL(file)` untuk foto yang mau disimpan permanen — itu cuma sementara dan akan hilang saat refresh.\n\n' +
+'4. FOTO/GAMBAR — JANGAN BIKIN TOMBOL UPLOAD SENDIRI\n' +
+'Buat elemen gambar cukup `<img src={siteData.sections.xxx.image} data-edit="sections.xxx.image" data-edit-type="image" />` — itu aja, TANPA tombol/label/input upload apa pun di sekitarnya. JANGAN bikin fungsi `handleFileChange`, JANGAN pakai `<input type="file">`, JANGAN tampilkan ikon kamera/label "Ganti Foto" yang nempel di gambar. Platform ini yang nyediain cara ganti foto (lewat fitur klik-edit di preview, dan Panel Admin di halaman live) — kalau AI bikin tombol upload sendiri di kode, itu bakal MUNCUL DAN BISA DIPAKAI SIAPA PUN yang buka halaman live-nya (gak aman, gak kegembok login).\n\n' +
 (wantsLogo ?
 '5. LOGO\n' +
 'Tambahkan field `logo` di dalam `defaultSiteData.design` (jadi `design.logo`, isi awal boleh null/kosong). Tampilkan logo itu di navbar (pojok kiri), pakai `data-edit="design.logo" data-edit-type="image"` (biar bisa diedit lewat fitur klik-langsung platform). Kalau `design.logo` masih kosong, tampilkan teks fallback: "' + (logoFallback || '(nama bisnis)') + '" sebagai gantinya.\n\n'
