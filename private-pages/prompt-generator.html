@@ -146,6 +146,18 @@
     </div>
 
     <div class="field">
+      <label>Informasi Tambahan (opsional)</label>
+      <p class="hint" style="margin-top:-4px;margin-bottom:10px;">Hal-hal khusus yang AI perlu tau, misal: sejarah singkat, keunggulan dibanding kompetitor, promo yang lagi jalan, dll.</p>
+      <textarea id="extraInfo" placeholder="misal: Sudah berdiri 8 tahun, satu-satunya di Sleman yang pakai produk ceramic coating asli Jerman. Lagi ada promo diskon 20% khusus bulan ini."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Batasan / Larangan (opsional)</label>
+      <p class="hint" style="margin-top:-4px;margin-bottom:10px;">Hal-hal yang AI JANGAN lakukan/tulis, misal: jangan sebut kompetitor, jangan janji yang berlebihan, dll.</p>
+      <textarea id="restrictions" placeholder="misal: Jangan bikin klaim 'nomor 1 di Indonesia', jangan sebut merek kompetitor, jangan pakai kata 'termurah'."></textarea>
+    </div>
+
+    <div class="field">
       <label>Section yang Mau Ada</label>
       <p class="hint" style="margin-top:-4px;margin-bottom:10px;">Klik nama section buat aktif/nonaktifkan. Kalau aktif, muncul kotak buat isi detailnya.</p>
       <div id="sectionsContainer"></div>
@@ -504,6 +516,8 @@ function buildPromptText(){
   const bizName = document.getElementById('bizName').value.trim() || '(isi nama bisnis)';
   const bizType = document.getElementById('bizType').value.trim() || '(isi jenis bisnis)';
   const bizAudience = document.getElementById('bizAudience').value.trim() || '(isi target audiens)';
+  const extraInfo = document.getElementById('extraInfo').value.trim();
+  const restrictions = document.getElementById('restrictions').value.trim();
   const sections = sectionDefs.filter(s => s.active);
   const styleRaw = document.getElementById('styleSelect').value;
   const style = styleRaw === '__AI_CHOOSE__'
@@ -580,6 +594,8 @@ function buildPromptText(){
 'NAMA BISNIS: ' + bizName + '\n' +
 'JENIS BISNIS: ' + bizType + '\n' +
 'TARGET AUDIENS: ' + bizAudience + '\n' +
+(extraInfo ? 'INFORMASI TAMBAHAN (penting, masukkan ke copywriting kalau relevan): ' + extraInfo + '\n' : '') +
+(restrictions ? 'BATASAN/LARANGAN (WAJIB DIPATUHI, JANGAN DILANGGAR): ' + restrictions + '\n' : '') +
 'BAHASA KONTEN: ' + lang + '\n\n' +
 'SECTION YANG HARUS ADA:\n' + sectionList + '\n\n' +
 'GAYA VISUAL: ' + style + '\n' +
@@ -1029,6 +1045,8 @@ function collectDraftData(){
     bizName: document.getElementById('bizName').value,
     bizType: document.getElementById('bizType').value,
     bizAudience: document.getElementById('bizAudience').value,
+    extraInfo: document.getElementById('extraInfo').value,
+    restrictions: document.getElementById('restrictions').value,
     sectionDefs: JSON.parse(JSON.stringify(sectionDefs)),
     style: document.getElementById('styleSelect').value,
     layout: document.getElementById('layoutSelect').value,
@@ -1068,6 +1086,8 @@ document.getElementById('loadDraftBtn').addEventListener('click', () => {
   document.getElementById('bizName').value = d.bizName || '';
   document.getElementById('bizType').value = d.bizType || '';
   document.getElementById('bizAudience').value = d.bizAudience || '';
+  document.getElementById('extraInfo').value = d.extraInfo || '';
+  document.getElementById('restrictions').value = d.restrictions || '';
 
   sectionDefs.length = 0;
   (d.sectionDefs || []).forEach(s => sectionDefs.push(s));
