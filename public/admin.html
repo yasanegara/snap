@@ -69,6 +69,7 @@
     <h1>🔒 Login Admin</h1>
     <p class="sub">Masuk buat kelola konten website ini.</p>
     <div id="loadErrorMsg" class="error-msg"></div>
+    <div id="diagnosticHint" class="hint" style="margin-bottom:14px;display:none;"></div>
     <label>Username</label>
     <input type="text" id="loginUsername" />
     <label>Password</label>
@@ -302,6 +303,20 @@ document.getElementById('loginPassword').addEventListener('keydown', (e) => {
       showLoadError('Situs ini belum punya data yang bisa dikelola (mungkin belum pernah dibuka sekali).');
       return;
     }
+
+    // Info diagnostik: kasih tau username yang KEDETEKSI dari data situs (aman, gak nampilin password)
+    const hasDesign = !!(siteData.design && siteData.design.adminUsername);
+    const detectedUser = hasDesign ? siteData.design.adminUsername : 'admin (nilai default, bukan dari situs)';
+    const hint = document.getElementById('diagnosticHint');
+    hint.style.display = 'block';
+    if (!hasDesign) {
+      hint.style.color = 'var(--danger)';
+      hint.textContent = '⚠️ Situs ini kayaknya belum nyimpen username/password sendiri (kode dari AI mungkin gak nambahin field itu). Username yang kedeteksi: "' + detectedUser + '" dengan password KOSONG. Coba login pakai itu, atau generate ulang situsnya.';
+    } else {
+      hint.style.color = 'var(--muted)';
+      hint.textContent = 'Username yang kedeteksi dari situs ini: "' + detectedUser + '"';
+    }
+
     if (sessionStorage.getItem(SESSION_KEY) === '1') {
       showAdminView();
     }

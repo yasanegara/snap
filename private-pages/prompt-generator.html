@@ -689,9 +689,17 @@ function buildPromptText(){
 '5. LOGO\n' +
 'Tambahkan field `logo` di dalam `defaultSiteData.design` (jadi `design.logo`, isi awal boleh null/kosong). Tampilkan logo itu di navbar (pojok kiri), pakai `data-edit="design.logo" data-edit-type="image"` (biar bisa diedit lewat fitur klik-langsung platform). Kalau `design.logo` masih kosong, tampilkan teks fallback: "' + (logoFallback || '(nama bisnis)') + '" sebagai gantinya.\n\n'
 : '') +
-(wantsLogo ? '6. DATA ADMIN (WAJIB, TAPI JANGAN BIKIN UI-NYA)\n' : '5. DATA ADMIN (WAJIB, TAPI JANGAN BIKIN UI-NYA)\n') +
-'Tambahkan field `adminUsername` dan `adminPassword` di dalam `defaultSiteData.design`, isi awalnya: `adminUsername: "' + adminUsername + '"`, `adminPassword: "' + adminPassword + '"`.\n' +
-'PENTING: KAMU TIDAK PERLU membuat halaman login, panel admin, tombol gear, form ganti password, atau apa pun terkait admin di kode kamu. Platform ini SUDAH PUNYA panel admin terpusat sendiri di luar kode kamu (otomatis bisa toggle section, ganti password, dan edit data mentah). Cukup sediakan 2 field itu di `defaultSiteData.design`, SELESAI — jangan tambah kode admin apa pun lagi. Ini penting banget buat bikin kode kamu tetap ringkas.\n\n' +
+(wantsLogo ? '6. DATA ADMIN (WAJIB ADA DI DATA, TAPI JANGAN BIKIN UI-NYA)\n' : '5. DATA ADMIN (WAJIB ADA DI DATA, TAPI JANGAN BIKIN UI-NYA)\n') +
+'WAJIB: di dalam `defaultSiteData.design`, HARUS ada 2 field ini PERSIS SEPERTI CONTOH INI (jangan diubah nama field-nya, jangan dihilangkan):\n\n' +
+'```jsx\n' +
+'design: {\n' +
+'  // ...field design lain kamu tetep di sini (ctaColor dll)...\n' +
+'  adminUsername: "' + adminUsername + '",\n' +
+'  adminPassword: "' + adminPassword + '"\n' +
+'}\n' +
+'```\n\n' +
+'2 field ini WAJIB ada walaupun kamu TIDAK bikin halaman login/panel admin apa pun di kode kamu. Platform ini punya panel admin terpusat sendiri di luar kode kamu (otomatis bisa toggle section, ganti password, dan edit data) yang akan BACA 2 field ini dari data situsmu. Kalau kamu lupa/lewatin 2 field ini, pemilik situs gak akan bisa masuk ke panel adminnya sama sekali.\n' +
+'JANGAN bikin halaman login, tombol gear, form ganti password, atau kode admin apa pun lagi — itu semua udah disediakan platform, kamu CUKUP sediakan 2 field data di atas. Ini penting banget biar kode kamu tetap ringkas.\n\n' +
 (wantsLogo ? '7. RESPONSIVE\n' : '6. RESPONSIVE\n') +
 'Pastikan tampilan rapi di HP (mobile-first) dan desktop.\n\n' +
 'PENTING BUAT PANJANG KODE (WAJIB DIIKUTI SEMUA, INI SERING BIKIN KODE KEPOTONG):\n' +
