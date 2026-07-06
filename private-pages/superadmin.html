@@ -95,6 +95,11 @@
         <select id="anthropicModelSelect"></select>
       </div>
       <div class="field">
+        <label>Batas Maksimal Token Output</label>
+        <input type="text" id="anthropicMaxTokensInput" placeholder="misal: 64000" />
+        <p class="hint">Jangan diisi lebih dari batas asli modelnya (biasanya bikin error). Default: 64000.</p>
+      </div>
+      <div class="field">
         <label>API Key Anthropic</label>
         <input type="text" id="anthropicApiKeyInput" placeholder="sk-ant-... (kosongkan kalau gak mau ganti)" />
         <p class="hint" id="anthropicKeyHint"></p>
@@ -106,6 +111,11 @@
         <label>Nama Model di Sumopod</label>
         <input type="text" id="sumopodModelInput" placeholder="misal: claude-sonnet-4-6, gpt-5.2, gemini/gemini-2.5-flash" />
         <p class="hint">Cek daftar model lengkap & harganya di ai.sumopod.com → AI → Model Hub.</p>
+      </div>
+      <div class="field">
+        <label>Batas Maksimal Token Output</label>
+        <input type="text" id="sumopodMaxTokensInput" placeholder="misal: 120000" />
+        <p class="hint">Beda model beda batas asli (cek di Model Hub Sumopod). Model "reasoning" (MiniMax, DeepSeek, dll) biasanya butuh angka lebih besar karena sebagian token kepake buat "mikir" duluan. Default: 120000.</p>
       </div>
       <div class="field">
         <label>API Key Sumopod</label>
@@ -319,9 +329,11 @@ async function loadAiSettings(){
       '<option value="' + m + '"' + (m === s.anthropic.model ? ' selected' : '') + '>' + m + '</option>'
     ).join('');
     document.getElementById('anthropicKeyHint').textContent = keySourceText(s.anthropic.keySource);
+    document.getElementById('anthropicMaxTokensInput').value = s.anthropic.maxTokens;
 
     document.getElementById('sumopodModelInput').value = s.sumopod.model;
     document.getElementById('sumopodKeyHint').textContent = keySourceText(s.sumopod.keySource);
+    document.getElementById('sumopodMaxTokensInput').value = s.sumopod.maxTokens;
   } catch (e) { /* biarin */ }
 }
 loadAiSettings();
@@ -332,8 +344,10 @@ document.getElementById('saveSettingsBtn').addEventListener('click', async () =>
   const provider = document.getElementById('providerSelect').value;
   const anthropicModel = document.getElementById('anthropicModelSelect').value;
   const anthropicApiKey = document.getElementById('anthropicApiKeyInput').value.trim();
+  const anthropicMaxTokens = document.getElementById('anthropicMaxTokensInput').value.trim();
   const sumopodModel = document.getElementById('sumopodModelInput').value.trim();
   const sumopodApiKey = document.getElementById('sumopodApiKeyInput').value.trim();
+  const sumopodMaxTokens = document.getElementById('sumopodMaxTokensInput').value.trim();
   const statusEl = document.getElementById('saveSettingsStatus');
   statusEl.textContent = 'Menyimpan...';
   try {
@@ -344,8 +358,10 @@ document.getElementById('saveSettingsBtn').addEventListener('click', async () =>
         provider,
         anthropicModel,
         anthropicApiKey: anthropicApiKey || undefined,
+        anthropicMaxTokens: anthropicMaxTokens || undefined,
         sumopodModel,
-        sumopodApiKey: sumopodApiKey || undefined
+        sumopodApiKey: sumopodApiKey || undefined,
+        sumopodMaxTokens: sumopodMaxTokens || undefined
       })
     });
     if (!res.ok) throw new Error('Gagal menyimpan');

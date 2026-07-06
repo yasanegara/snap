@@ -876,23 +876,27 @@ app.get('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, 
     apiKeyMasked: apiKey ? apiKey.slice(0, 10) + '...' + apiKey.slice(-4) : '',
     anthropic: {
       model: (await getSetting('ai_model_anthropic', null)) || process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+      maxTokens: parseInt((await getSetting('ai_max_tokens_anthropic', null)) || '64000', 10),
       keySource: anthropicKeySrc,
       availableModels: ANTHROPIC_MODELS
     },
     sumopod: {
       model: (await getSetting('ai_model_sumopod', null)) || process.env.SUMOPOD_MODEL || 'claude-sonnet-4-6',
+      maxTokens: parseInt((await getSetting('ai_max_tokens_sumopod', null)) || '120000', 10),
       keySource: sumopodKeySrc
     }
   });
 });
 
 app.post('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {
-  const { provider, anthropicModel, anthropicApiKey, sumopodModel, sumopodApiKey } = req.body || {};
+  const { provider, anthropicModel, anthropicApiKey, anthropicMaxTokens, sumopodModel, sumopodApiKey, sumopodMaxTokens } = req.body || {};
   if (provider) await setSetting('ai_provider', provider);
   if (anthropicModel) await setSetting('ai_model_anthropic', anthropicModel);
   if (anthropicApiKey) await setSetting('ai_api_key_anthropic', anthropicApiKey);
+  if (anthropicMaxTokens) await setSetting('ai_max_tokens_anthropic', String(parseInt(anthropicMaxTokens, 10)));
   if (sumopodModel) await setSetting('ai_model_sumopod', sumopodModel);
   if (sumopodApiKey) await setSetting('ai_api_key_sumopod', sumopodApiKey);
+  if (sumopodMaxTokens) await setSetting('ai_max_tokens_sumopod', String(parseInt(sumopodMaxTokens, 10)));
   res.json({ ok: true });
 });
 
