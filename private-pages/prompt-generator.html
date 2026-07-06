@@ -1079,7 +1079,8 @@ document.getElementById('saveToWorkspaceBtn').addEventListener('click', async ()
     resultBox.style.display = 'block';
     resultBox.style.background = '#0f2e29';
     resultBox.style.color = '#a7f3e8';
-    resultBox.innerHTML = 'Tersimpan di workspace ✓ — <a href="/app" style="color:#5eead4;text-decoration:underline;">Buka di tool preview</a> buat lanjut edit.';
+    const directLink = '/app?workspaceId=' + encodeURIComponent(workspaceId) + '&snippetId=' + encodeURIComponent(data.id);
+    resultBox.innerHTML = 'Tersimpan di workspace ✓ — <a href="' + directLink + '" style="color:#5eead4;text-decoration:underline;">Buka halaman ini di tool preview</a> buat lanjut edit.';
   } catch (e) {
     resultBox.style.display = 'block';
     resultBox.style.background = '#2a1010';

@@ -954,6 +954,20 @@ async function loadHistory(){
       };
       historyList.appendChild(el);
     });
+
+    // Kalau dibuka lewat link yang nyebutin ?snippetId=..., langsung buka halaman itu
+    const urlParamSnippetId = new URLSearchParams(window.location.search).get('snippetId');
+    if (urlParamSnippetId) {
+      const target = items.find(it => it.id === urlParamSnippetId);
+      if (target) {
+        codeInput.value = target.code;
+        setType(target.type);
+        currentSnippetId = target.id;
+        currentSnippetPublish = target.lastPublishedSlug ? { slug: target.lastPublishedSlug, domain: target.lastPublishedDomain } : null;
+        updatePublishButtonState();
+        runPreview();
+      }
+    }
   } catch (e) {
     historyList.innerHTML = '<div class="empty-hint">Belum bisa terhubung ke server. Pastikan server (node server.js) sedang jalan.</div>';
   }
