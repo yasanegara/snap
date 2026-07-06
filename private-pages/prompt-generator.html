@@ -687,27 +687,11 @@ function buildPromptText(){
 'JANGAN PERNAH pakai `URL.createObjectURL(file)` untuk foto yang mau disimpan permanen — itu cuma sementara dan akan hilang saat refresh.\n\n' +
 (wantsLogo ?
 '5. LOGO\n' +
-'Tambahkan field `logo` di dalam `defaultSiteData.design` (jadi `design.logo`, isi awal boleh null/kosong). Tampilkan logo itu di navbar (pojok kiri). Kalau `design.logo` masih kosong, tampilkan teks fallback: "' + (logoFallback || '(nama bisnis)') + '" sebagai gantinya. Logo ini HARUS bisa diupload/diganti lewat panel admin, pakai pola upload yang sama seperti poin 4 di atas (base64 lewat FileReader), disimpan di `design.logo`.\n\n'
+'Tambahkan field `logo` di dalam `defaultSiteData.design` (jadi `design.logo`, isi awal boleh null/kosong). Tampilkan logo itu di navbar (pojok kiri), pakai `data-edit="design.logo" data-edit-type="image"` (biar bisa diedit lewat fitur klik-langsung platform). Kalau `design.logo` masih kosong, tampilkan teks fallback: "' + (logoFallback || '(nama bisnis)') + '" sebagai gantinya.\n\n'
 : '') +
-(wantsLogo ? '6. HALAMAN ADMIN (WAJIB SESINGKAT MUNGKIN)\n' : '5. HALAMAN ADMIN (WAJIB SESINGKAT MUNGKIN)\n') +
-'PENTING: platform ini SUDAH PUNYA fitur "klik-langsung buat edit teks/foto" otomatis (gak butuh kode tambahan dari kamu). Tapi sebagai CADANGAN kalau fitur itu gak jalan, panel admin WAJIB juga punya cara edit manual yang RINGKAS (lihat poin 5a di bawah — JANGAN bikin form input satu-satu per field karena boros kode):\n' +
-'- Panel admin isinya: (a) toggle tampilkan/sembunyikan tiap section, (b) EDITOR CADANGAN per section (lihat poin 5a, WAJIB ADA), (c) field GANTI PASSWORD (lihat aturan di bawah, WAJIB ADA), (d) tombol logout' + (wantsLogo ? ', (e) upload logo' : '') + '.\n' +
-'- Akses admin: tombol kecil/ikon gear yang gak mencolok di navbar.\n\n' +
-'5a. EDITOR CADANGAN PER SECTION (WAJIB, TAPI HARUS RINGKAS)\n' +
-'JANGAN bikin form input teks/textarea manual satu-satu per field (misal input khusus buat "judul", input khusus buat "harga", dst) — itu paling boros kode dan bikin hasil kepotong.\n' +
-'Sebagai gantinya, buat SATU komponen generik (namanya bebas, misal `SectionRawEditor`) yang dipakai ULANG buat semua section lewat `.map()`, isinya:\n' +
-'- Judul section + tombol "Buka/Tutup" (collapse/expand, defaultnya tertutup)\n' +
-'- Kalau dibuka: 1 `<textarea>` besar yang isinya `JSON.stringify(siteData.sections[namaSection], null, 2)` (data section itu dalam bentuk teks JSON mentah)\n' +
-'- 1 tombol "Simpan Perubahan": waktu diklik, `JSON.parse()` isi textarea itu, kalau berhasil update `siteData.sections[namaSection]` pakai `setSiteData`; kalau `JSON.parse` gagal (teksnya rusak), tampilkan pesan error singkat, JANGAN gagal total/crash.\n' +
-'Ini cara paling ringkas buat kasih akses edit ke SEMUA section tanpa perlu bikin form beda-beda per section.\n\n' +
-'5b. LOGIN & GANTI PASSWORD (WAJIB, JANGAN DI-HARDCODE)\n' +
-'Username dan password admin JANGAN ditulis langsung di kode (jangan hardcode). Sebagai gantinya:\n' +
-'- Tambahkan field `adminUsername` dan `adminPassword` di dalam `defaultSiteData.design`, isi awalnya: `adminUsername: "' + adminUsername + '"`, `adminPassword: "' + adminPassword + '"`.\n' +
-'- Waktu user login, cocokkan input dengan `siteData.design.adminUsername` dan `siteData.design.adminPassword` (bukan string yang ditulis manual di kode).\n' +
-'- Di panel admin, WAJIB ada bagian kecil "Ganti Password": 1 input buat password baru, 1 tombol "Simpan Password Baru". Kalau diklik, update `design.adminPassword` pakai `setSiteData` (otomatis kesimpen sendiri, gak perlu backend tambahan).\n' +
-'- PENTING: karena data baru kebaca setelah `dataLoaded` jadi true, tampilkan halaman login HANYA setelah `dataLoaded === true` (kalau belum, tampilkan tulisan "Memuat..." dulu), biar gak salah cek password lama.\n\n' +
-(wantsLogo ? '6b. ' : '5c. ') + 'AKSES LEWAT #admin\n' +
-'Selain tombol gear, buat juga supaya kalau pengunjung membuka website dengan menambahkan `#admin` di akhir URL (contoh: namadomain.com/#admin), halaman login admin langsung otomatis muncul. Caranya: cek `window.location.hash === "#admin"` di komponen App saat pertama kali render (pakai useEffect), kalau cocok maka langsung set tampilan ke halaman login (bukan ke halaman publik).\n\n' +
+(wantsLogo ? '6. DATA ADMIN (WAJIB, TAPI JANGAN BIKIN UI-NYA)\n' : '5. DATA ADMIN (WAJIB, TAPI JANGAN BIKIN UI-NYA)\n') +
+'Tambahkan field `adminUsername` dan `adminPassword` di dalam `defaultSiteData.design`, isi awalnya: `adminUsername: "' + adminUsername + '"`, `adminPassword: "' + adminPassword + '"`.\n' +
+'PENTING: KAMU TIDAK PERLU membuat halaman login, panel admin, tombol gear, form ganti password, atau apa pun terkait admin di kode kamu. Platform ini SUDAH PUNYA panel admin terpusat sendiri di luar kode kamu (otomatis bisa toggle section, ganti password, dan edit data mentah). Cukup sediakan 2 field itu di `defaultSiteData.design`, SELESAI — jangan tambah kode admin apa pun lagi. Ini penting banget buat bikin kode kamu tetap ringkas.\n\n' +
 (wantsLogo ? '7. RESPONSIVE\n' : '6. RESPONSIVE\n') +
 'Pastikan tampilan rapi di HP (mobile-first) dan desktop.\n\n' +
 'PENTING BUAT PANJANG KODE (WAJIB DIIKUTI SEMUA, INI SERING BIKIN KODE KEPOTONG):\n' +

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Panel Admin Website</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151a; --panel-2:#171b21; --line:#232830;
+    --text:#e6e9ee; --muted:#8b93a1; --accent:#5eead4; --accent-text:#04211d; --accent-dim:#0f2e29;
+    --danger:#ff6b6b; --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;min-height:100%;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);}
+  .center-box{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:100%;max-width:380px;}
+  .card h1{font-size:17px;margin:0 0 4px;}
+  .card p.sub{font-size:12.5px;color:var(--muted);margin:0 0 20px;}
+  label{font-size:11.5px;color:var(--muted);display:block;margin-bottom:5px;}
+  input[type=text], input[type=password]{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    padding:9px 11px;border-radius:8px;font-size:13.5px;margin-bottom:14px;outline:none;
+  }
+  .btn{
+    background:var(--panel-2);color:var(--text);border:1px solid var(--line);
+    padding:9px 16px;border-radius:8px;font-size:13px;cursor:pointer;
+  }
+  .btn:hover{border-color:var(--accent);}
+  .btn.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent);font-weight:600;width:100%;}
+  .error-msg{color:var(--danger);font-size:12.5px;margin:-8px 0 12px;display:none;}
+  header{
+    display:flex;align-items:center;justify-content:space-between;padding:14px 20px;
+    border-bottom:1px solid var(--line);background:var(--panel);
+  }
+  header h1{font-size:14.5px;margin:0;}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 18px 60px;}
+  .panel-section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+  .panel-section h2{font-size:13.5px;margin:0 0 12px;}
+  .section-row{
+    display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);
+  }
+  .section-row:last-child{border-bottom:none;}
+  .section-row .name{font-size:13.5px;font-weight:500;text-transform:capitalize;}
+  .toggle-switch{position:relative;width:38px;height:22px;flex-shrink:0;}
+  .toggle-switch input{opacity:0;width:0;height:0;}
+  .toggle-slider{
+    position:absolute;inset:0;background:var(--line);border-radius:12px;cursor:pointer;transition:background .15s;
+  }
+  .toggle-slider:before{
+    content:"";position:absolute;height:16px;width:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .15s;
+  }
+  input:checked + .toggle-slider{background:var(--accent);}
+  input:checked + .toggle-slider:before{transform:translateX(16px);}
+  .row-actions{display:flex;gap:8px;align-items:center;}
+  .row-actions .btn{padding:6px 10px;font-size:11.5px;}
+  textarea.json-editor{
+    width:100%;min-height:140px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    padding:10px;border-radius:8px;font-size:12px;font-family:ui-monospace,monospace;margin:10px 0;box-sizing:border-box;
+  }
+  .status-msg{font-size:12px;margin-top:8px;display:none;}
+  .hint{font-size:11.5px;color:var(--muted);line-height:1.5;}
+</style>
+</head>
+<body>
+
+<div id="loginView" class="center-box">
+  <div class="card">
+    <h1>🔒 Login Admin</h1>
+    <p class="sub">Masuk buat kelola konten website ini.</p>
+    <div id="loadErrorMsg" class="error-msg"></div>
+    <label>Username</label>
+    <input type="text" id="loginUsername" />
+    <label>Password</label>
+    <input type="password" id="loginPassword" />
+    <div id="loginErrorMsg" class="error-msg"></div>
+    <button class="btn primary" id="loginBtn">Masuk</button>
+  </div>
+</div>
+
+<div id="adminView" style="display:none;">
+  <header>
+    <h1>⚙️ Panel Admin Website</h1>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <a id="backToSiteLink" href="#" style="color:var(--accent);font-size:12.5px;text-decoration:none;">← Lihat Situs</a>
+      <button class="btn" id="logoutBtn" style="padding:6px 12px;font-size:12px;">Keluar</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="panel-section">
+      <h2>Tampilkan / Sembunyikan Section</h2>
+      <div id="sectionToggleList"></div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Edit Data Section (mode lanjutan)</h2>
+      <p class="hint" style="margin-bottom:12px;">Cara paling gampang tetap edit langsung dari tampilan situsnya (klik konten yang mau diubah). Ini cuma cadangan kalau itu gak bisa dipakai.</p>
+      <div id="sectionEditorList"></div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Ganti Password</h2>
+      <label>Password Baru</label>
+      <input type="password" id="newPasswordInput" placeholder="Minimal 4 karakter" />
+      <button class="btn" id="changePasswordBtn">Simpan Password Baru</button>
+      <div class="status-msg" id="passwordStatusMsg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const endpoint = params.get('endpoint');
+const SESSION_KEY = 'admin_auth_' + (endpoint || 'unknown');
+
+let siteData = null;
+
+function showLoadError(msg){
+  document.getElementById('loadErrorMsg').textContent = msg;
+  document.getElementById('loadErrorMsg').style.display = 'block';
+}
+
+async function fetchSiteData(){
+  const res = await fetch(endpoint);
+  if (!res.ok) throw new Error('Gagal memuat data situs (HTTP ' + res.status + ')');
+  return await res.json();
+}
+
+async function saveSiteData(data){
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Gagal menyimpan (HTTP ' + res.status + ')');
+}
+
+function renderSectionToggles(){
+  const list = document.getElementById('sectionToggleList');
+  const order = siteData.sectionOrder || Object.keys(siteData.sections || {});
+  if (order.length === 0) { list.innerHTML = '<p class="hint">Gak ada section terdeteksi.</p>'; return; }
+
+  list.innerHTML = order.map(name => {
+    const visible = siteData.sections[name] ? siteData.sections[name].visible !== false : true;
+    return `
+      <div class="section-row">
+        <span class="name">${name}</span>
+        <label class="toggle-switch">
+          <input type="checkbox" data-section="${name}" class="section-visible-toggle" ${visible ? 'checked' : ''} />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('.section-visible-toggle').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const name = cb.dataset.section;
+      if (!siteData.sections[name]) siteData.sections[name] = {};
+      siteData.sections[name].visible = cb.checked;
+      try {
+        await saveSiteData(siteData);
+      } catch (e) {
+        alert('Gagal menyimpan: ' + e.message);
+        cb.checked = !cb.checked;
+      }
+    });
+  });
+}
+
+function renderSectionEditors(){
+  const list = document.getElementById('sectionEditorList');
+  const order = siteData.sectionOrder || Object.keys(siteData.sections || {});
+  if (order.length === 0) { list.innerHTML = '<p class="hint">Gak ada section terdeteksi.</p>'; return; }
+
+  list.innerHTML = order.map(name => `
+    <div style="border-bottom:1px solid var(--line);padding:10px 0;">
+      <div class="row-actions" style="justify-content:space-between;">
+        <span class="name" style="text-transform:capitalize;font-size:13px;">${name}</span>
+        <button class="btn toggle-editor-btn" data-section="${name}">Buka/Tutup</button>
+      </div>
+      <div class="editor-body" data-section-body="${name}" style="display:none;">
+        <textarea class="json-editor" data-section-textarea="${name}">${escapeHtml(JSON.stringify(siteData.sections[name] || {}, null, 2))}</textarea>
+        <button class="btn primary" style="width:auto;" data-save-section="${name}">Simpan Perubahan</button>
+        <div class="status-msg" data-section-status="${name}"></div>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.toggle-editor-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const body = list.querySelector('[data-section-body="' + btn.dataset.section + '"]');
+      body.style.display = body.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+
+  list.querySelectorAll('[data-save-section]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.saveSection;
+      const textarea = list.querySelector('[data-section-textarea="' + name + '"]');
+      const statusEl = list.querySelector('[data-section-status="' + name + '"]');
+      let parsed;
+      try {
+        parsed = JSON.parse(textarea.value);
+      } catch (e) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--danger)';
+        statusEl.textContent = 'Format JSON gak valid: ' + e.message;
+        return;
+      }
+      siteData.sections[name] = parsed;
+      try {
+        await saveSiteData(siteData);
+        statusEl.style.display = 'block';
+        statusEl.style.color = '#5eead4';
+        statusEl.textContent = 'Tersimpan ✓';
+        renderSectionToggles();
+      } catch (e) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--danger)';
+        statusEl.textContent = 'Gagal simpan: ' + e.message;
+      }
+    });
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+}
+
+function showAdminView(){
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('adminView').style.display = 'block';
+  renderSectionToggles();
+  renderSectionEditors();
+}
+
+document.getElementById('backToSiteLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  window.history.back();
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  sessionStorage.removeItem(SESSION_KEY);
+  window.location.reload();
+});
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginErrorMsg');
+  errEl.style.display = 'none';
+
+  if (!siteData) { errEl.textContent = 'Data situs belum berhasil dimuat.'; errEl.style.display = 'block'; return; }
+
+  const validUser = (siteData.design && siteData.design.adminUsername) || 'admin';
+  const validPass = (siteData.design && siteData.design.adminPassword) || '';
+
+  if (username === validUser && password === validPass) {
+    sessionStorage.setItem(SESSION_KEY, '1');
+    showAdminView();
+  } else {
+    errEl.textContent = 'Username atau password salah.';
+    errEl.style.display = 'block';
+  }
+});
+
+document.getElementById('changePasswordBtn').addEventListener('click', async () => {
+  const newPass = document.getElementById('newPasswordInput').value;
+  const statusEl = document.getElementById('passwordStatusMsg');
+  if (!newPass || newPass.length < 4) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Password minimal 4 karakter.';
+    return;
+  }
+  if (!siteData.design) siteData.design = {};
+  siteData.design.adminPassword = newPass;
+  try {
+    await saveSiteData(siteData);
+    statusEl.style.display = 'block';
+    statusEl.style.color = '#5eead4';
+    statusEl.textContent = 'Password berhasil diganti ✓';
+    document.getElementById('newPasswordInput').value = '';
+  } catch (e) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Gagal simpan: ' + e.message;
+  }
+});
+
+document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('loginBtn').click();
+});
+
+(async function init(){
+  if (!endpoint) { showLoadError('Alamat data situs gak ditemukan di link ini.'); return; }
+  try {
+    siteData = await fetchSiteData();
+    if (!siteData || !siteData.sections) {
+      showLoadError('Situs ini belum punya data yang bisa dikelola (mungkin belum pernah dibuka sekali).');
+      return;
+    }
+    if (sessionStorage.getItem(SESSION_KEY) === '1') {
+      showAdminView();
+    }
+  } catch (e) {
+    showLoadError('Gagal memuat data situs: ' + e.message);
+  }
+})();
+</script>
+
+</body>
+</html>
