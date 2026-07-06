@@ -4,6 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Live Preview Studio</title>
+<script>
+  // Set tema SEBELUM CSS dirender, biar gak "kedip" salah warna pas halaman kebuka
+  (function(){
+    var saved = localStorage.getItem('studioTheme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  })();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
 <style>
   :root{
@@ -14,10 +21,25 @@
     --text:#e6e9ee;
     --muted:#8b93a1;
     --accent:#5eead4;
+    --accent-text:#04211d;
     --accent-dim:#0f2e29;
     --danger:#ff6b6b;
     --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+    --shadow: 0 1px 3px rgba(0,0,0,.4);
+  }
+  html[data-theme="light"]{
+    --bg:#f4f6f8;
+    --panel:#ffffff;
+    --panel-2:#eef1f4;
+    --line:#dde2e8;
+    --text:#1a1d23;
+    --muted:#6b7280;
+    --accent:#0f766e;
+    --accent-text:#ffffff;
+    --accent-dim:#d5f3ee;
+    --danger:#dc2626;
+    --shadow: 0 1px 3px rgba(0,0,0,.08);
   }
   *{box-sizing:border-box;}
   html,body{height:100%;margin:0;}
@@ -37,11 +59,20 @@
     border-bottom:1px solid var(--line);
     background:var(--panel);
     flex-shrink:0;
+    box-shadow: var(--shadow);
+    position: relative;
+    z-index: 5;
   }
   .brand{display:flex;align-items:center;gap:10px;}
   .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);}
   .brand h1{font-size:14px;font-weight:600;margin:0;letter-spacing:.2px;}
   .brand span{color:var(--muted);font-size:12px;}
+  .theme-toggle{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;
+    display:flex;align-items:center;justify-content:center;transition:background .15s;
+  }
+  .theme-toggle:hover{background:var(--line);}
   .layout{
     flex:1;
     display:flex;
@@ -130,7 +161,7 @@
     display:flex;align-items:center;gap:6px;
   }
   .btn:hover{border-color:#333a45;}
-  .btn.primary{background:var(--accent);color:#04211d;border-color:var(--accent);}
+  .btn.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent);}
   .btn.primary:hover{filter:brightness(1.05);}
   textarea{
     flex:1;
@@ -197,6 +228,7 @@
     <span id="orgLabel" style="font-size:12.5px;color:var(--muted);"></span>
     <a href="/prompt-generator.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">🧠 Prompt Generator</a>
     <a href="/billing.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">Upgrade</a>
+    <button id="themeToggleBtn" class="theme-toggle" title="Ganti mode terang/gelap">🌙</button>
     <button id="logoutBtn" class="btn" style="padding:5px 10px;">Keluar</button>
   </div>
 </header>
@@ -239,6 +271,7 @@
         <div class="spacer"></div>
         <button class="btn" id="openTabBtn">Buka di tab baru</button>
         <button class="btn" id="resetDataBtn" title="Hapus semua data hasil edit di preview (kembali ke data awal kode)">Reset data</button>
+        <button class="btn" id="publishAsNewBtn" style="display:none;font-size:11.5px;" title="Publish ke alamat/slug yang berbeda (bukan update yang lama)">Publish sbg baru</button>
         <button class="btn primary" id="publishBtn">🚀 Publish</button>
       </div>
       <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups"></iframe>
@@ -319,6 +352,8 @@ loadMe();
 
 // ---------- Workspace ----------
 let currentWorkspaceId = null;
+let currentSnippetId = null;    // snippet yang lagi dibuka dari riwayat (null kalau kode baru/belum disimpan)
+let currentSnippetPublish = null; // { slug, domain } kalau snippet ini udah pernah dipublish
 const workspaceSelect = document.getElementById('workspaceSelect');
 
 async function loadWorkspaces(selectId){
@@ -917,13 +952,74 @@ function slugify(s){
     .slice(0, 60);
 }
 
+function updatePublishButtonState(){
+  const btn = document.getElementById('publishBtn');
+  const asNewBtn = document.getElementById('publishAsNewBtn');
+  if (currentSnippetPublish && currentSnippetPublish.slug) {
+    btn.textContent = '🔄 Update Publikasi';
+    btn.title = 'Update halaman live yang sudah ada (/p/' + currentSnippetPublish.slug + ') pakai kode terbaru, tanpa isi ulang slug';
+    asNewBtn.style.display = 'inline-block';
+  } else {
+    btn.textContent = '🚀 Publish';
+    btn.title = '';
+    asNewBtn.style.display = 'none';
+  }
+}
+
 document.getElementById('publishBtn').onclick = () => {
   if (!codeInput.value.trim()) { return; }
+
+  // Kalau project ini udah pernah dipublish sebelumnya, langsung update aja (gak perlu isi ulang slug)
+  if (currentSnippetPublish && currentSnippetPublish.slug) {
+    republishExisting();
+    return;
+  }
+
   document.getElementById('publishSlugInput').value = '';
   document.getElementById('publishDomainInput').value = '';
   document.getElementById('publishResult').style.display = 'none';
   document.getElementById('publishModal').classList.add('show');
 };
+
+async function republishExisting(){
+  const btn = document.getElementById('publishBtn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Update...';
+  try {
+    const code = codeInput.value;
+    const slug = currentSnippetPublish.slug;
+    const html = currentType === 'react'
+      ? buildReactDoc(code, { dataEndpointBase: '/api/public-data/', dataKey: slug })
+      : buildHtmlDoc(code, { dataEndpointBase: '/api/public-data/', dataKey: slug });
+
+    const res = await fetch('/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slug, customDomain: currentSnippetPublish.domain || null, html, type: currentType,
+        workspaceId: currentWorkspaceId, snippetId: currentSnippetId
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Gagal update publish.'); return; }
+    const fullUrl = window.location.origin + data.url;
+    alert('Berhasil di-update! Halaman live-nya udah pakai kode terbaru.\n\n' + fullUrl);
+  } catch (e) {
+    alert('Gagal update publish: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+document.getElementById('publishAsNewBtn')?.addEventListener('click', () => {
+  document.getElementById('publishSlugInput').value = '';
+  document.getElementById('publishDomainInput').value = '';
+  document.getElementById('publishResult').style.display = 'none';
+  document.getElementById('publishModal').classList.add('show');
+});
+
 document.getElementById('cancelPublishBtn').onclick = () => {
   document.getElementById('publishModal').classList.remove('show');
 };
@@ -961,12 +1057,17 @@ document.getElementById('confirmPublishBtn').onclick = async () => {
     const res = await fetch('/api/publish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, customDomain: domain || null, html, type: currentType, initialData, workspaceId: currentWorkspaceId })
+      body: JSON.stringify({ slug, customDomain: domain || null, html, type: currentType, initialData, workspaceId: currentWorkspaceId, snippetId: currentSnippetId })
     });
     const data = await res.json();
     if (!res.ok) {
       alert(data.error || 'Gagal publish.');
       return;
+    }
+    if (currentSnippetId) {
+      currentSnippetPublish = { slug, domain: domain || null };
+      updatePublishButtonState();
+      loadHistory();
     }
     const fullUrl = window.location.origin + data.url;
     resultBox.style.display = 'block';
@@ -1045,9 +1146,12 @@ async function loadHistory(){
       const el = document.createElement('div');
       el.className = 'history-item';
       const date = item.savedAt ? new Date(item.savedAt).toLocaleDateString('id-ID') : '';
+      const publishBadge = item.lastPublishedSlug
+        ? '<span title="Sudah dipublish: /p/' + escapeHtml(item.lastPublishedSlug) + '" style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;background:var(--accent-dim);color:var(--accent);font-size:9.5px;font-weight:600;vertical-align:middle;">🌐 Published</span>'
+        : '';
       el.innerHTML = `
         <div class="meta">
-          <div class="name">${escapeHtml(item.name || 'Tanpa nama')}</div>
+          <div class="name">${escapeHtml(item.name || 'Tanpa nama')}${publishBadge}</div>
           <div class="sub">${item.type === 'react' ? 'React' : 'HTML'} · ${date}</div>
         </div>
         <button title="Hapus">✕</button>
@@ -1055,12 +1159,16 @@ async function loadHistory(){
       el.querySelector('.meta').onclick = () => {
         codeInput.value = item.code;
         setType(item.type);
+        currentSnippetId = item.id;
+        currentSnippetPublish = item.lastPublishedSlug ? { slug: item.lastPublishedSlug, domain: item.lastPublishedDomain } : null;
+        updatePublishButtonState();
         runPreview();
       };
       el.querySelector('button').onclick = async (e) => {
         e.stopPropagation();
         if (confirm('Hapus "' + item.name + '" dari riwayat?')) {
           await fetch('/api/snippets/' + item.id, { method: 'DELETE' });
+          if (currentSnippetId === item.id) { currentSnippetId = null; currentSnippetPublish = null; updatePublishButtonState(); }
           loadHistory();
         }
       };
@@ -1089,6 +1197,19 @@ function loadPendingGeneratedCode(){
 loadPendingGeneratedCode();
 
 loadHistory();
+// ---------- Toggle Mode Terang/Gelap ----------
+function applyThemeIcon(){
+  const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+  document.getElementById('themeToggleBtn').textContent = theme === 'dark' ? '🌙' : '☀️';
+}
+document.getElementById('themeToggleBtn').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('studioTheme', next);
+  applyThemeIcon();
+});
+applyThemeIcon();
 </script>
 </body>
 </html>

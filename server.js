@@ -293,7 +293,7 @@ app.get('/api/snippets', requireAuth, async (req, res) => {
   const { workspaceId } = req.query;
   if (!workspaceId) return res.status(400).json({ error: 'workspaceId wajib diisi' });
   const r = await pool.query(
-    'SELECT id, name, type, code, saved_at AS "savedAt" FROM snippets WHERE org_id = $1 AND workspace_id = $2 ORDER BY saved_at DESC',
+    'SELECT id, name, type, code, saved_at AS "savedAt", last_published_slug AS "lastPublishedSlug", last_published_domain AS "lastPublishedDomain" FROM snippets WHERE org_id = $1 AND workspace_id = $2 ORDER BY saved_at DESC',
     [req.user.orgId, workspaceId]
   );
   res.json(r.rows);
@@ -377,7 +377,7 @@ app.get('/api/publish', requireAuth, async (req, res) => {
 });
 
 app.post('/api/publish', requireAuth, async (req, res) => {
-  const { slug, customDomain, html, type, initialData, workspaceId } = req.body || {};
+  const { slug, customDomain, html, type, initialData, workspaceId, snippetId } = req.body || {};
   if (!slug || !SLUG_PATTERN.test(slug)) {
     return res.status(400).json({ error: 'Slug gak valid. Pakai huruf kecil, angka, dan tanda "-" aja, misal: exist-detailing' });
   }
@@ -412,6 +412,15 @@ app.post('/api/publish', requireAuth, async (req, res) => {
       `INSERT INTO public_data (slug, data) VALUES ($1,$2)
        ON CONFLICT (slug) DO NOTHING`,
       [slug, initialData]
+    );
+  }
+
+  // Tandain di snippet-nya (kalau publish ini dipicu dari project yang tersimpan), biar kelihatan
+  // di riwayat "ini udah pernah dipublish" dan gampang di-update lagi tanpa isi ulang slug.
+  if (snippetId) {
+    await pool.query(
+      'UPDATE snippets SET last_published_slug = $2, last_published_domain = $3 WHERE id = $1 AND org_id = $4',
+      [snippetId, slug, customDomain || null, req.user.orgId]
     );
   }
 
