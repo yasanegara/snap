@@ -341,6 +341,18 @@ app.delete('/api/snippets/:id', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Update project yang udah pernah disimpan (dipanggil pas klik "Simpan" ulang, tanpa perlu isi nama lagi)
+app.put('/api/snippets/:id', requireAuth, async (req, res) => {
+  const { code, type } = req.body || {};
+  if (!code) return res.status(400).json({ error: 'code wajib diisi' });
+  const r = await pool.query(
+    'UPDATE snippets SET code = $3, type = $4, saved_at = $5 WHERE id = $1 AND org_id = $2 RETURNING id, name',
+    [req.params.id, req.user.orgId, code, type || 'react', Date.now()]
+  );
+  if (r.rowCount === 0) return res.status(404).json({ error: 'Project tidak ditemukan' });
+  res.json({ ok: true, id: r.rows[0].id, name: r.rows[0].name });
+});
+
 // ---------------------------------------------------------------------------
 // Data live preview (tiruan Firestore), dipisah per tim + per project
 // ---------------------------------------------------------------------------

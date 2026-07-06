@@ -69,8 +69,9 @@
   .ws-card{
     background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px;
     display:flex; flex-direction:column; gap:12px; transition:border-color .15s, transform .15s;
+    cursor:pointer;
   }
-  .ws-card:hover{border-color:var(--accent);}
+  .ws-card:hover{border-color:var(--accent);transform:translateY(-2px);}
   .ws-tag{
     font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
     font-weight:600;
@@ -111,7 +112,7 @@
 <header>
   <div class="brand"><span class="dot"></span><h1>Live Preview Studio</h1></div>
   <div style="display:flex;align-items:center;gap:10px;">
-    <a href="/prompt-generator.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">🧠 Prompt Generator</a>
+    <a href="/app" style="font-size:12.5px;color:var(--accent);text-decoration:none;">🖥️ Studio</a>
     <a href="/billing.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">Upgrade</a>
     <button id="themeToggleBtn" class="theme-toggle" title="Ganti mode terang/gelap">🌙</button>
     <button id="logoutBtn" class="btn">Keluar</button>
@@ -201,7 +202,7 @@ async function loadWorkspaceCards(){
     let html = '';
     list.forEach(ws => {
       html += `
-        <div class="ws-card">
+        <div class="ws-card" data-workspace-id="${escapeHtml(ws.id)}">
           <div>
             <div class="ws-tag">Workspace</div>
             <div class="ws-name" title="${escapeHtml(ws.name)}">${escapeHtml(ws.name)}</div>
@@ -212,8 +213,8 @@ async function loadWorkspaceCards(){
             <span>📝 Draft <b>${ws.draftCount}</b></span>
           </div>
           <div class="ws-actions">
-            <button class="btn primary" onclick="location.href='/app?workspaceId=${encodeURIComponent(ws.id)}'">Buat Halaman</button>
-            <button class="btn" onclick="location.href='/prompt-generator.html?workspaceId=${encodeURIComponent(ws.id)}'" title="Generate artikel yang SEO-optimized">📰 Generate Articles</button>
+            <button class="btn primary" data-action="studio">Buka Studio</button>
+            <button class="btn" data-action="articles" title="Generate artikel yang SEO-optimized">📰 Generate Articles</button>
           </div>
         </div>
       `;
@@ -225,6 +226,20 @@ async function loadWorkspaceCards(){
       </div>
     `;
     grid.innerHTML = html;
+
+    // Klik di mana pun di kartu -> masuk Studio. Klik tombol tertentu -> aksi masing-masing.
+    grid.querySelectorAll('.ws-card').forEach(card => {
+      const wsId = card.dataset.workspaceId;
+      card.addEventListener('click', () => { location.href = '/app?workspaceId=' + encodeURIComponent(wsId); });
+      card.querySelector('[data-action="studio"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        location.href = '/app?workspaceId=' + encodeURIComponent(wsId);
+      });
+      card.querySelector('[data-action="articles"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        location.href = '/prompt-generator.html?workspaceId=' + encodeURIComponent(wsId);
+      });
+    });
 
     document.getElementById('newWorkspaceCard').addEventListener('click', () => {
       document.getElementById('workspaceNameInput').value = '';

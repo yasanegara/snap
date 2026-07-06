@@ -207,7 +207,7 @@
   }
   .modal h3{margin:0 0 12px;font-size:14px;}
   .modal input{
-    width:100%;background:#0d0f12;border:1px solid var(--line);color:var(--text);
+    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
     padding:8px 10px;border-radius:7px;font-size:13px;margin-bottom:14px;outline:none;
   }
   .modal .row{display:flex;gap:8px;justify-content:flex-end;}
@@ -915,6 +915,9 @@ document.getElementById('clearBtn').onclick = () => {
   previewFrame.srcdoc = '';
   statusBar.textContent = 'Siap. Paste kode, lalu klik Run.';
   statusBar.classList.remove('error');
+  currentSnippetId = null;
+  currentSnippetPublish = null;
+  updatePublishButtonState();
 };
 document.getElementById('openTabBtn').onclick = () => {
   const doc = previewFrame.srcdoc;
@@ -1088,10 +1091,48 @@ const saveNameInput = document.getElementById('saveNameInput');
 
 document.getElementById('saveBtn').onclick = () => {
   if (!codeInput.value.trim()) { return; }
+
+  // Kalau lagi buka project yang udah pernah disimpan, langsung update aja (gak perlu isi nama lagi)
+  if (currentSnippetId) {
+    updateExistingSnippet();
+    return;
+  }
+
   saveNameInput.value = '';
   saveModal.classList.add('show');
   saveNameInput.focus();
 };
+
+async function updateExistingSnippet(){
+  const btn = document.getElementById('saveBtn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Menyimpan...';
+  try {
+    const res = await fetch('/api/snippets/' + currentSnippetId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: codeInput.value, type: currentType })
+    });
+    if (res.status === 401) {
+      alert('Sesi login kamu sudah habis. Silakan login lagi.');
+      window.location.href = '/login.html';
+      return;
+    }
+    if (!res.ok) {
+      let detail = 'HTTP ' + res.status;
+      try { const data = await res.json(); if (data && data.error) detail = data.error; } catch (e2) { /* bukan JSON */ }
+      throw new Error(detail);
+    }
+    loadHistory();
+  } catch (e) {
+    alert('Gagal menyimpan.\n\nDetail: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
 document.getElementById('cancelSaveBtn').onclick = () => saveModal.classList.remove('show');
 document.getElementById('confirmSaveBtn').onclick = async () => {
   if (!currentWorkspaceId) { alert('Bikin/pilih workspace dulu ya, di sidebar kiri.'); return; }
@@ -1120,6 +1161,10 @@ document.getElementById('confirmSaveBtn').onclick = async () => {
       try { const data = await res.json(); if (data && data.error) detail = data.error; } catch (e2) { /* bukan JSON */ }
       throw new Error(detail);
     }
+    const data = await res.json();
+    currentSnippetId = data.id;
+    currentSnippetPublish = null;
+    updatePublishButtonState();
     saveModal.classList.remove('show');
     loadWorkspaces(currentWorkspaceId);
     loadHistory();
@@ -1148,7 +1193,7 @@ async function loadHistory(){
     items.forEach(item => {
       const el = document.createElement('div');
       el.className = 'history-item';
-      const date = item.savedAt ? new Date(item.savedAt).toLocaleDateString('id-ID') : '';
+      const date = item.savedAt ? new Date(Number(item.savedAt)).toLocaleDateString('id-ID') : '';
       const publishBadge = item.lastPublishedSlug
         ? '<span title="Sudah dipublish: /p/' + escapeHtml(item.lastPublishedSlug) + '" style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;background:var(--accent-dim);color:var(--accent);font-size:9.5px;font-weight:600;vertical-align:middle;">🌐 Published</span>'
         : '';
