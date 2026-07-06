@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Panduan Setting Domain</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151a; --panel-2:#171b21; --line:#232830;
+    --text:#e6e9ee; --muted:#8b93a1; --accent:#5eead4; --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;min-height:100%;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);}
+  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 70px;}
+  h1{font-size:22px;margin:0 0 6px;}
+  p.sub{color:var(--muted);font-size:14px;margin:0 0 30px;}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:18px;}
+  .box h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+  .field-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);gap:10px;}
+  .field-row:last-child{border-bottom:none;}
+  .field-row .k{font-size:12.5px;color:var(--muted);}
+  .field-row .v{font-size:13.5px;font-weight:600;font-family:ui-monospace,monospace;background:var(--panel-2);padding:4px 10px;border-radius:6px;word-break:break-all;}
+  .copy-btn{background:var(--panel-2);border:1px solid var(--line);color:var(--accent);padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;flex-shrink:0;}
+  .copy-btn:hover{border-color:var(--accent);}
+  ol{font-size:13.5px;line-height:1.9;padding-left:20px;margin:0;}
+  ol li{margin-bottom:6px;}
+  ol b{color:var(--accent);}
+  .note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6;}
+  .footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>🌐 Panduan Setting Domain</h1>
+  <p class="sub" id="subTitle">Ikuti langkah di bawah biar website kamu bisa diakses lewat domain sendiri.</p>
+
+  <div class="box">
+    <h2>📋 Data yang Kamu Butuhkan</h2>
+    <div class="field-row">
+      <span class="k">Domain kamu</span>
+      <span class="v" id="domainValue">-</span>
+    </div>
+    <div class="field-row">
+      <span class="k">Target CNAME</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="v" id="targetValue">-</span>
+        <button class="copy-btn" id="copyTargetBtn">Copy</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>✅ Langkah-langkah (pakai Cloudflare, gratis)</h2>
+    <ol>
+      <li>Bikin akun gratis di <b>cloudflare.com</b>, klik "Add a Site", masukin domain kamu.</li>
+      <li>Cloudflare bakal kasih 2 <b>nameserver</b> (contoh: <code>ana.ns.cloudflare.com</code>). Copy itu.</li>
+      <li>Buka tempat kamu beli domain (Niagahoster, Rumahweb, GoDaddy, dll), cari menu "Nameserver" / "DNS", ganti nameserver-nya pakai punya Cloudflare tadi.</li>
+      <li>Balik ke Cloudflare, buka menu <b>DNS</b>, tambah record baru:
+        <ul style="margin:8px 0;">
+          <li>Type: <b>CNAME</b></li>
+          <li>Name: <b>@</b> (atau <code>www</code> kalau mau pakai www)</li>
+          <li>Target: <b id="targetValueInline">-</b></li>
+          <li>Proxy status: pastikan <b>awan ORANYE nyala</b> (Proxied)</li>
+        </ul>
+      </li>
+      <li>Buka menu <b>SSL/TLS</b> di Cloudflare, pilih mode <b>"Full"</b>.</li>
+      <li>Tunggu 5-30 menit. Domain siap dipakai, SSL (https) otomatis aktif gratis.</li>
+    </ol>
+    <p class="note">💡 Kalau domainnya udah lama dipakai Cloudflare buat hal lain, cukup tambah record CNAME-nya aja (lewatin langkah ganti nameserver).<br><br>Ada pertanyaan? Hubungi lagi orang yang ngasih link ini ke kamu ya.</p>
+  </div>
+
+  <p class="footer-note">Dibuatkan otomatis oleh Live Preview Studio</p>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const domain = params.get('domain') || '(domain kamu)';
+const target = params.get('target') || window.location.host;
+
+document.getElementById('domainValue').textContent = domain;
+document.getElementById('targetValue').textContent = target;
+document.getElementById('targetValueInline').textContent = target;
+document.getElementById('subTitle').textContent = 'Ikuti langkah di bawah biar "' + domain + '" bisa diakses jadi website kamu.';
+
+document.getElementById('copyTargetBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText(target).then(() => {
+    const btn = document.getElementById('copyTargetBtn');
+    const original = btn.textContent;
+    btn.textContent = 'Kesalin ✓';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>

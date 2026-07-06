@@ -341,10 +341,11 @@
     <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px;">Domain (tanpa https://, tanpa www kalau gak perlu)</label>
     <input type="text" id="workspaceDomainInput" placeholder="misal: exist-detailing.com" />
     <div id="domainSaveResult" style="display:none;font-size:12px;margin-bottom:12px;padding:8px 10px;border-radius:7px;"></div>
-    <div class="row" style="margin-bottom:20px;">
+    <div class="row" style="margin-bottom:12px;">
       <button class="btn" id="closeDomainBtn">Tutup</button>
       <button class="btn primary" id="saveDomainBtn">Simpan Domain</button>
     </div>
+    <button class="btn" id="shareGuideBtn" style="width:100%;margin-bottom:20px;">📤 Bagikan Panduan ke Klien</button>
 
     <div style="border-top:1px solid var(--line);padding-top:14px;">
       <h4 style="font-size:13px;margin:0 0 10px;">📋 Cara pasang pakai Cloudflare (gratis)</h4>
@@ -538,6 +539,17 @@ document.getElementById('saveDomainBtn').onclick = async () => {
     resultBox.style.color = '#ff9c9c';
     resultBox.textContent = 'Gagal: ' + e.message;
   }
+};
+
+document.getElementById('shareGuideBtn').onclick = () => {
+  const domain = document.getElementById('workspaceDomainInput').value.trim();
+  if (!domain) { alert('Isi domainnya dulu ya (terus klik Simpan Domain juga biar tercatat).'); return; }
+  const link = window.location.origin + '/panduan-domain.html?domain=' + encodeURIComponent(domain) + '&target=' + encodeURIComponent(window.location.host);
+  navigator.clipboard.writeText(link).then(() => {
+    alert('Link panduan udah kesalin ✓\n\nTinggal kirim ke klien lewat WhatsApp/email:\n' + link);
+  }).catch(() => {
+    prompt('Copy link ini, kirim ke klien:', link);
+  });
 };
 
 document.getElementById('confirmInviteBtn').onclick = async () => {
