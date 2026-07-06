@@ -61,7 +61,7 @@ document.getElementById('form').addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (!res.ok) { errEl.textContent = data.error || 'Gagal daftar'; errEl.style.display = 'block'; return; }
-    window.location.href = '/app';
+    window.location.href = '/dashboard.html';
   } catch (e2) {
     errEl.textContent = 'Gak bisa terhubung ke server.'; errEl.style.display = 'block';
   }

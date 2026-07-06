@@ -151,19 +151,23 @@ app.post('/api/auth/logout', (req, res) => {
 app.get('/api/me', requireAuth, async (req, res) => {
   const org = await getOrg(req.user.orgId);
   const limits = await getPlanLimits(org);
+  const userRow = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.userId]);
   res.json({
     email: req.user.email,
+    role: userRow.rows[0] ? userRow.rows[0].role : 'member',
     org: org ? {
       id: org.id,
       name: org.name,
       plan: isOrgPro(org) ? 'pro' : 'free',
-      subscriptionExpiresAt: org.subscription_expires_at
+      subscriptionExpiresAt: org.subscription_expires_at,
+      tokenBalance: org ? Number(org.token_balance) : 0
     } : null,
     limits: {
       maxWorkspaces: limits.max_workspaces,
       maxPagesPerWorkspace: limits.max_pages_per_workspace,
       maxMembersPerWorkspace: limits.max_members_per_workspace,
-      maxAiGenerations: limits.max_ai_generations
+      maxAiGenerations: limits.max_ai_generations,
+      includedTokens: Number(limits.included_tokens)
     }
   });
 });
@@ -173,7 +177,10 @@ app.get('/api/me', requireAuth, async (req, res) => {
 // ---------------------------------------------------------------------------
 app.get('/api/workspaces', requireAuth, async (req, res) => {
   const r = await pool.query(
-    `SELECT w.id, w.name, w.created_at AS "createdAt", COUNT(s.id)::int AS "pageCount"
+    `SELECT w.id, w.name, w.created_at AS "createdAt",
+      COUNT(s.id)::int AS "pageCount",
+      COUNT(s.id) FILTER (WHERE s.last_published_slug IS NOT NULL)::int AS "publishedCount",
+      COUNT(s.id) FILTER (WHERE s.last_published_slug IS NULL)::int AS "draftCount"
      FROM workspaces w LEFT JOIN snippets s ON s.workspace_id = w.id
      WHERE w.org_id = $1 GROUP BY w.id ORDER BY w.created_at ASC`,
     [req.user.orgId]

@@ -226,6 +226,7 @@
   <div style="display:flex;align-items:center;gap:10px;">
     <span id="planBadge" style="font-size:11px;background:var(--panel-2);color:var(--muted);padding:4px 9px;border-radius:6px;"></span>
     <span id="orgLabel" style="font-size:12.5px;color:var(--muted);"></span>
+    <a href="/dashboard.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">🏠 Dashboard</a>
     <a href="/prompt-generator.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">🧠 Prompt Generator</a>
     <a href="/billing.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">Upgrade</a>
     <button id="themeToggleBtn" class="theme-toggle" title="Ganti mode terang/gelap">🌙</button>
@@ -236,14 +237,14 @@
 <div class="layout">
   <aside class="sidebar">
     <div style="padding:12px 14px 8px;border-bottom:1px solid var(--line);">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;">Workspace (= Klien)</div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;">Workspace</div>
       <select id="workspaceSelect" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:7px 8px;border-radius:7px;font-size:12.5px;margin-bottom:8px;"></select>
       <div style="display:flex;gap:6px;">
-        <button class="btn" id="newWorkspaceBtn" style="flex:1;padding:6px;font-size:12px;">+ Klien Baru</button>
+        <button class="btn" id="newWorkspaceBtn" style="flex:1;padding:6px;font-size:12px;">+ Workspace</button>
         <button class="btn" id="manageMembersBtn" style="flex:1;padding:6px;font-size:12px;">👥 Anggota</button>
       </div>
     </div>
-    <h2>Halaman Klien Ini</h2>
+    <h2>Halaman di Workspace Ini</h2>
     <div class="history-list" id="historyList">
       <div class="empty-hint">Belum ada yang disimpan. Klik "Simpan" setelah run untuk menyimpan kode ke riwayat.</div>
     </div>
@@ -308,8 +309,7 @@
 <div class="modal-backdrop" id="workspaceModal">
   <div class="modal">
     <h3>Bikin Workspace Baru</h3>
-    <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;line-height:1.5;">💡 Saran: 1 Workspace = 1 klien. Jadi tiap ada klien baru, bikin workspace baru khusus buat dia — biar rapi dan gak ketuker sama klien lain.</p>
-    <input type="text" id="workspaceNameInput" placeholder="Nama klien, misal: Bengkel Sleman" />
+    <input type="text" id="workspaceNameInput" placeholder="Nama workspace, misal: Klien Bengkel Sleman" />
     <div class="row">
       <button class="btn" id="cancelWorkspaceBtn">Batal</button>
       <button class="btn primary" id="confirmWorkspaceBtn">Buat</button>
@@ -382,7 +382,9 @@ async function loadWorkspaces(selectId){
     historyList.innerHTML = '<div class="empty-hint">Gagal memuat workspace.</div>';
   }
 }
-loadWorkspaces();
+// Kalau dibuka dari Dashboard dengan ?workspaceId=..., langsung pilih workspace itu
+const urlParamWorkspaceId = new URLSearchParams(window.location.search).get('workspaceId');
+loadWorkspaces(urlParamWorkspaceId || undefined);
 
 workspaceSelect.addEventListener('change', () => {
   currentWorkspaceId = workspaceSelect.value;

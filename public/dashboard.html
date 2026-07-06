@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — Live Preview Studio</title>
+<script>
+  (function(){
+    var saved = localStorage.getItem('studioTheme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  })();
+</script>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151a; --panel-2:#171b21; --line:#232830;
+    --text:#e6e9ee; --muted:#8b93a1; --accent:#5eead4; --accent-text:#04211d; --accent-dim:#0f2e29;
+    --danger:#ff6b6b; --shadow: 0 1px 3px rgba(0,0,0,.4);
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  }
+  html[data-theme="light"]{
+    --bg:#f4f6f8; --panel:#ffffff; --panel-2:#eef1f4; --line:#dde2e8;
+    --text:#1a1d23; --muted:#6b7280; --accent:#0f766e; --accent-text:#ffffff; --accent-dim:#d5f3ee;
+    --danger:#dc2626; --shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;min-height:100%;}
+  body{ background:var(--bg); color:var(--text); font-family:var(--sans); }
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 24px; border-bottom:1px solid var(--line); background:var(--panel);
+    box-shadow:var(--shadow); position:relative; z-index:5;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);}
+  .brand h1{font-size:15px;font-weight:600;margin:0;}
+  .theme-toggle{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .theme-toggle:hover{background:var(--line);}
+  .btn{
+    background:var(--panel-2); color:var(--text); border:1px solid var(--line);
+    padding:8px 14px; border-radius:8px; font-size:13px; cursor:pointer;
+  }
+  .btn:hover{border-color:var(--accent);}
+  .btn.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent);font-weight:600;}
+  .wrap{ max-width:1100px; margin:0 auto; padding:28px 24px 60px; }
+
+  .account-bar{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px;
+    margin-bottom:32px;
+  }
+  .account-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px;
+  }
+  .account-card .label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px;}
+  .account-card .value{font-size:19px;font-weight:700;}
+  .account-card .value.small{font-size:15px;}
+
+  .section-title{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;
+  }
+  .section-title h2{font-size:16px;margin:0;}
+
+  .workspace-grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px;
+  }
+  .ws-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px;
+    display:flex; flex-direction:column; gap:12px; transition:border-color .15s, transform .15s;
+  }
+  .ws-card:hover{border-color:var(--accent);}
+  .ws-tag{
+    font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+    font-weight:600;
+  }
+  .ws-name{font-size:17px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ws-stats{font-size:12.5px;color:var(--muted);display:flex;gap:6px;align-items:center;}
+  .ws-stats b{color:var(--text);font-weight:600;}
+  .ws-actions{display:flex;gap:8px;margin-top:4px;}
+  .ws-actions .btn{flex:1;font-size:12px;padding:8px 6px;text-align:center;}
+
+  .new-ws-card{
+    border:1.5px dashed var(--line); border-radius:14px; padding:18px;
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;
+    cursor:pointer; color:var(--muted); font-size:13px; min-height:150px;
+    transition:border-color .15s, color .15s;
+  }
+  .new-ws-card:hover{border-color:var(--accent);color:var(--accent);}
+  .new-ws-card .plus{font-size:26px;}
+
+  .empty-hint{padding:30px;text-align:center;color:var(--muted);font-size:13px;}
+
+  .modal-backdrop{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
+    align-items:center; justify-content:center; z-index:1000;
+  }
+  .modal-backdrop.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;width:340px;}
+  .modal h3{margin:0 0 14px;font-size:15px;}
+  .modal input[type=text]{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    padding:9px 11px;border-radius:8px;font-size:13px;margin-bottom:14px;
+  }
+  .modal .row{display:flex;gap:8px;justify-content:flex-end;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="dot"></span><h1>Live Preview Studio</h1></div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <a href="/prompt-generator.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">🧠 Prompt Generator</a>
+    <a href="/billing.html" style="font-size:12.5px;color:var(--accent);text-decoration:none;">Upgrade</a>
+    <button id="themeToggleBtn" class="theme-toggle" title="Ganti mode terang/gelap">🌙</button>
+    <button id="logoutBtn" class="btn">Keluar</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="account-bar" id="accountBar">
+    <div class="account-card"><div class="label">Paket</div><div class="value small" id="accPlan">...</div></div>
+    <div class="account-card"><div class="label">Token Tersedia</div><div class="value" id="accToken">...</div></div>
+    <div class="account-card"><div class="label">Jenis Membership</div><div class="value small" id="accRole">...</div></div>
+    <div class="account-card"><div class="label">Tim</div><div class="value small" id="accOrgName">...</div></div>
+  </div>
+
+  <div class="section-title">
+    <h2>Workspace Kamu</h2>
+  </div>
+  <div class="workspace-grid" id="workspaceGrid">
+    <div class="empty-hint">Memuat...</div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="workspaceModal">
+  <div class="modal">
+    <h3>Bikin Workspace Baru</h3>
+    <input type="text" id="workspaceNameInput" placeholder="Nama workspace, misal: Klien Bengkel Sleman" />
+    <div class="row">
+      <button class="btn" id="cancelWorkspaceBtn">Batal</button>
+      <button class="btn primary" id="confirmWorkspaceBtn">Buat</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function applyThemeIcon(){
+  const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+  document.getElementById('themeToggleBtn').textContent = theme === 'dark' ? '🌙' : '☀️';
+}
+document.getElementById('themeToggleBtn').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('studioTheme', next);
+  applyThemeIcon();
+});
+applyThemeIcon();
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  window.location.href = '/login.html';
+});
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function loadAccountInfo(){
+  try {
+    const res = await fetch('/api/me');
+    if (res.status === 401) { window.location.href = '/login.html'; return; }
+    const me = await res.json();
+
+    document.getElementById('accOrgName').textContent = me.org ? me.org.name : '-';
+    document.getElementById('accRole').textContent = me.role === 'owner' ? '👑 Owner' : '👤 Member';
+
+    if (me.org && me.org.plan === 'pro') {
+      document.getElementById('accPlan').textContent = '⭐ Pro';
+      document.getElementById('accToken').textContent = 'Tanpa batas';
+    } else {
+      document.getElementById('accPlan').textContent = 'Gratis';
+      const balance = me.org ? Number(me.org.tokenBalance) : 0;
+      const total = me.limits ? Number(me.limits.includedTokens) : 0;
+      document.getElementById('accToken').textContent = balance.toLocaleString('id-ID') + ' / ' + total.toLocaleString('id-ID');
+    }
+  } catch (e) {
+    document.getElementById('accOrgName').textContent = 'Gagal memuat';
+  }
+}
+
+async function loadWorkspaceCards(){
+  const grid = document.getElementById('workspaceGrid');
+  try {
+    const res = await fetch('/api/workspaces');
+    if (res.status === 401) { window.location.href = '/login.html'; return; }
+    const list = await res.json();
+
+    let html = '';
+    list.forEach(ws => {
+      html += `
+        <div class="ws-card">
+          <div>
+            <div class="ws-tag">Workspace</div>
+            <div class="ws-name" title="${escapeHtml(ws.name)}">${escapeHtml(ws.name)}</div>
+          </div>
+          <div class="ws-stats">
+            <span>🌐 Publish <b>${ws.publishedCount}</b></span>
+            <span>·</span>
+            <span>📝 Draft <b>${ws.draftCount}</b></span>
+          </div>
+          <div class="ws-actions">
+            <button class="btn primary" onclick="location.href='/app?workspaceId=${encodeURIComponent(ws.id)}'">Buat Halaman</button>
+            <button class="btn" onclick="location.href='/prompt-generator.html?workspaceId=${encodeURIComponent(ws.id)}'" title="Generate artikel yang SEO-optimized">📰 Generate Articles</button>
+          </div>
+        </div>
+      `;
+    });
+    html += `
+      <div class="new-ws-card" id="newWorkspaceCard">
+        <div class="plus">+</div>
+        <div>Workspace Baru</div>
+      </div>
+    `;
+    grid.innerHTML = html;
+
+    document.getElementById('newWorkspaceCard').addEventListener('click', () => {
+      document.getElementById('workspaceNameInput').value = '';
+      document.getElementById('workspaceModal').classList.add('show');
+      document.getElementById('workspaceNameInput').focus();
+    });
+  } catch (e) {
+    grid.innerHTML = '<div class="empty-hint">Gagal memuat workspace.</div>';
+  }
+}
+
+document.getElementById('cancelWorkspaceBtn').addEventListener('click', () => {
+  document.getElementById('workspaceModal').classList.remove('show');
+});
+
+document.getElementById('confirmWorkspaceBtn').addEventListener('click', async () => {
+  const name = document.getElementById('workspaceNameInput').value.trim();
+  if (!name) { alert('Isi nama workspace dulu ya.'); return; }
+  try {
+    const res = await fetch('/api/workspaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    if (res.status === 402) {
+      document.getElementById('workspaceModal').classList.remove('show');
+      if (confirm((data.error || 'Paket kamu sudah penuh.') + '\n\nBuka halaman upgrade sekarang?')) {
+        window.location.href = '/billing.html';
+      }
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || 'Gagal membuat workspace');
+    document.getElementById('workspaceModal').classList.remove('show');
+    loadWorkspaceCards();
+  } catch (e) {
+    alert('Gagal membuat workspace.\n\nDetail: ' + e.message);
+  }
+});
+
+loadAccountInfo();
+loadWorkspaceCards();
+</script>
+
+</body>
+</html>
