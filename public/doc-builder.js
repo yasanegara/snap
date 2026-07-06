@@ -271,7 +271,7 @@ function buildReactDoc(code, options){
 
   const dataEndpointBase = options.dataEndpointBase || '/api/data/';
   const dataKey = options.dataKey || hashCode(code.trim());
-  const enableEditOverlay = true; // manual edit (teks/angka/gambar) aktif di preview MAUPUN halaman live/publish
+  const enableEditOverlay = dataEndpointBase === '/api/data/'; // cuma aktif di preview, dimatiin lagi di halaman live/publish (edit cuma lewat panel admin)
   const aiEditEndpoint = dataEndpointBase === '/api/data/' ? '/api/edit-section' : null; // null = mati di halaman live/publish
   const combined = RUNNER_SHIMS_SRC + '\n' + transformed + '\n' + mountCode;
   const combinedEscaped = JSON.stringify(combined);
@@ -347,7 +347,7 @@ function buildHtmlDoc(code, options){
   options = options || {};
   const dataEndpointBase = options.dataEndpointBase || '/api/data/';
   const dataKey = options.dataKey || hashCode(code.trim());
-  const enableEditOverlay = true; // manual edit (teks/angka/gambar) aktif di preview MAUPUN halaman live/publish
+  const enableEditOverlay = dataEndpointBase === '/api/data/'; // cuma aktif di preview, dimatiin lagi di halaman live/publish (edit cuma lewat panel admin)
   const aiEditEndpoint = dataEndpointBase === '/api/data/' ? '/api/edit-section' : null; // null = mati di halaman live/publish
   const bridgeTag = `<script>
     window.__projectId = ${JSON.stringify(dataKey)};
