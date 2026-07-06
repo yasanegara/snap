@@ -49,7 +49,7 @@
   }
 
   function closeAllPopovers(){
-    ['__edit-choice-menu', '__edit-popover', '__ai-section-popover'].forEach(function(id){
+    ['__edit-choice-menu', '__edit-popover', '__ai-section-popover', '__section-panel'].forEach(function(id){
       var el = document.getElementById(id);
       if (el) el.remove();
     });
@@ -57,6 +57,67 @@
 
   function clampTop(top){ return Math.min(top, window.innerHeight - 220); }
   function clampLeft(left, width){ return Math.min(Math.max(left, 8), window.innerWidth - width - 8); }
+
+  function fieldLabel(el){
+    var path = el.getAttribute('data-edit') || '';
+    var parts = path.split('.');
+    return parts[parts.length - 1] || path;
+  }
+
+  // ---------- Panel: buka SATU section utuh, tampilin semua bagian yang bisa diedit ----------
+  function openSectionPanel(sectionEl, sectionName){
+    closeAllPopovers();
+    var fields = Array.prototype.slice.call(sectionEl.querySelectorAll('[data-edit]'));
+
+    var panel = document.createElement('div');
+    panel.id = '__section-panel';
+    panel.style.cssText = 'position:fixed;z-index:999999;background:#fff;border:1px solid #ddd;border-radius:14px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);font-family:-apple-system,sans-serif;width:300px;max-height:70vh;overflow-y:auto;top:70px;right:20px;';
+
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
+    header.innerHTML = '<div style="font-size:13.5px;font-weight:700;color:#111;text-transform:capitalize;">📦 Section: ' + sectionName + '</div>';
+    var closeX = document.createElement('button');
+    closeX.textContent = '✕';
+    closeX.style.cssText = 'border:none;background:none;font-size:15px;cursor:pointer;color:#666;';
+    closeX.onclick = function(){ panel.remove(); };
+    header.appendChild(closeX);
+    panel.appendChild(header);
+
+    if (fields.length === 0) {
+      var emptyMsg = document.createElement('div');
+      emptyMsg.style.cssText = 'font-size:12px;color:#888;margin-bottom:12px;';
+      emptyMsg.textContent = 'Gak ada bagian yang ditandai bisa diedit di section ini.';
+      panel.appendChild(emptyMsg);
+    } else {
+      fields.forEach(function(fieldEl){
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee;gap:8px;';
+        var label = document.createElement('span');
+        label.style.cssText = 'font-size:12px;color:#333;text-transform:capitalize;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;';
+        label.textContent = fieldLabel(fieldEl);
+        var editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.style.cssText = 'padding:5px 10px;border:1px solid #ccc;background:#f8f8f8;border-radius:6px;font-size:11px;cursor:pointer;flex-shrink:0;';
+        editBtn.onclick = function(){ closeAllPopovers(); openDirectEditPopover(fieldEl); };
+        row.appendChild(label);
+        row.appendChild(editBtn);
+        panel.appendChild(row);
+      });
+    }
+
+    if (window.__aiEditEndpoint) {
+      var aiBtn = document.createElement('button');
+      aiBtn.textContent = '✨ Edit Section Ini dengan AI';
+      aiBtn.style.cssText = 'width:100%;margin-top:12px;padding:10px 12px;border:none;background:#7C3AED;color:#fff;border-radius:8px;font-size:12.5px;cursor:pointer;font-weight:700;';
+      aiBtn.onclick = function(){
+        closeAllPopovers();
+        openAiSectionPopover(sectionName, sectionEl);
+      };
+      panel.appendChild(aiBtn);
+    }
+
+    document.body.appendChild(panel);
+  }
 
   // ---------- Menu pilihan pas konten diklik ----------
   function openChoiceMenu(el){
@@ -281,7 +342,38 @@
     textarea.focus();
   }
 
-  // ---------- Pasang highlight + listener klik ----------
+  // ---------- Pasang highlight + listener klik + tombol per-section ----------
+  function attachSectionButtons(){
+    if (!window.__getSiteData) return false;
+    var siteData = window.__getSiteData();
+    var sectionOrder = (siteData && siteData.sectionOrder) || (siteData && Object.keys(siteData.sections || {})) || [];
+    var found = false;
+
+    sectionOrder.forEach(function(name){
+      var el = document.getElementById(name);
+      if (!el || el.dataset.__sectionBtnAttached) return;
+      found = true;
+      el.dataset.__sectionBtnAttached = '1';
+
+      var computed = window.getComputedStyle(el);
+      if (computed.position === 'static') el.style.position = 'relative';
+
+      var btn = document.createElement('button');
+      btn.textContent = '📦 Edit Section';
+      btn.style.cssText = 'position:absolute;top:10px;left:10px;z-index:99997;background:#1a1d23;color:#fff;border:none;padding:6px 12px;border-radius:20px;font-size:11px;cursor:pointer;font-family:-apple-system,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3);opacity:0;transition:opacity .2s;';
+      el.appendChild(btn);
+
+      el.addEventListener('mouseenter', function(){ btn.style.opacity = '1'; });
+      el.addEventListener('mouseleave', function(){ btn.style.opacity = '0'; });
+
+      btn.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation();
+        openSectionPanel(el, name);
+      });
+    });
+    return found;
+  }
+
   function init(){
     var styleTag = document.createElement('style');
     styleTag.textContent = '[data-edit]:hover{ outline:2px dashed #5eead4 !important; outline-offset:2px; cursor:pointer !important; }';
@@ -293,6 +385,16 @@
       e.preventDefault(); e.stopPropagation();
       openChoiceMenu(el);
     }, true);
+
+    (function retrySectionButtons(attempt){
+      attempt = attempt || 0;
+      var ok = attachSectionButtons();
+      if (!ok && attempt < 15) {
+        setTimeout(function(){ retrySectionButtons(attempt + 1); }, 500);
+      } else {
+        setInterval(attachSectionButtons, 2000);
+      }
+    })();
   }
 
   if (document.readyState === 'loading') {
