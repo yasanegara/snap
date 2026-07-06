@@ -158,6 +158,17 @@
     </div>
 
     <div class="field">
+      <label>Referensi (opsional)</label>
+      <p class="hint" style="margin-top:-4px;margin-bottom:10px;">Punya contoh website yang gayanya kamu suka, atau gambar/poster/logo yang mau dijadiin acuan warna & tampilan? Isi di sini.</p>
+      <input type="text" id="referenceUrl" placeholder="Link website contoh (opsional), misal: https://contoh-website-idaman.com" style="margin-bottom:10px;" />
+      <input type="file" id="referenceImageInput" accept="image/*" style="width:100%;font-size:12.5px;" />
+      <div id="referenceImagePreviewBox" style="display:none;margin-top:10px;">
+        <img id="referenceImagePreview" style="max-width:100%;max-height:140px;border-radius:8px;border:1px solid var(--line);" />
+        <button type="button" id="removeReferenceImageBtn" class="btn small" style="margin-top:6px;">Hapus gambar</button>
+      </div>
+    </div>
+
+    <div class="field">
       <label>Section yang Mau Ada</label>
       <p class="hint" style="margin-top:-4px;margin-bottom:10px;">Klik nama section buat aktif/nonaktifkan. Kalau aktif, muncul kotak buat isi detailnya.</p>
       <div id="sectionsContainer"></div>
@@ -491,6 +502,31 @@ waChip.addEventListener('click', syncWaFields);
 syncWaFields();
 
 // Tampilkan/sembunyikan kotak alamat Google Maps sesuai chip aktif/enggak
+// ---------- Gambar/poster referensi (opsional, beneran dikirim ke AI biar "dilihat") ----------
+let referenceImageBase64 = null;
+let referenceImageMediaType = null;
+
+document.getElementById('referenceImageInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { alert('Ukuran gambar maksimal 5MB ya.'); e.target.value = ''; return; }
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    referenceImageBase64 = reader.result.split(',')[1];
+    referenceImageMediaType = file.type || 'image/png';
+    document.getElementById('referenceImagePreview').src = reader.result;
+    document.getElementById('referenceImagePreviewBox').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('removeReferenceImageBtn').addEventListener('click', () => {
+  referenceImageBase64 = null;
+  referenceImageMediaType = null;
+  document.getElementById('referenceImageInput').value = '';
+  document.getElementById('referenceImagePreviewBox').style.display = 'none';
+});
+
 const mapsChip = document.getElementById('mapsChip');
 const mapsFields = document.getElementById('mapsFields');
 function syncMapsFields(){
@@ -518,6 +554,7 @@ function buildPromptText(){
   const bizAudience = document.getElementById('bizAudience').value.trim() || '(isi target audiens)';
   const extraInfo = document.getElementById('extraInfo').value.trim();
   const restrictions = document.getElementById('restrictions').value.trim();
+  const referenceUrl = document.getElementById('referenceUrl').value.trim();
   const sections = sectionDefs.filter(s => s.active);
   const styleRaw = document.getElementById('styleSelect').value;
   const style = styleRaw === '__AI_CHOOSE__'
@@ -596,6 +633,8 @@ function buildPromptText(){
 'TARGET AUDIENS: ' + bizAudience + '\n' +
 (extraInfo ? 'INFORMASI TAMBAHAN (penting, masukkan ke copywriting kalau relevan): ' + extraInfo + '\n' : '') +
 (restrictions ? 'BATASAN/LARANGAN (WAJIB DIPATUHI, JANGAN DILANGGAR): ' + restrictions + '\n' : '') +
+(referenceUrl ? 'REFERENSI GAYA: pengguna kasih contoh website idaman di ' + referenceUrl + ' — kalau kamu familiar/pernah lihat situs ini, coba ambil kesan gaya visualnya (warna/layout/vibe), tapi TETAP bikin konten & copywriting yang orisinal.\n' : '') +
+(referenceImageBase64 ? 'REFERENSI GAMBAR/POSTER: pengguna melampirkan 1 gambar sebagai acuan (lihat gambar yang disertakan). Ambil kesan warna, gaya visual, dan vibe dari gambar itu buat diterapkan ke desain website ini.\n' : '') +
 'BAHASA KONTEN: ' + lang + '\n\n' +
 'SECTION YANG HARUS ADA:\n' + sectionList + '\n\n' +
 'GAYA VISUAL: ' + style + '\n' +
@@ -904,10 +943,14 @@ async function runGenerate(){
   }
 
   try {
+    const requestBody = { prompt };
+    if (referenceImageBase64) {
+      requestBody.referenceImage = { base64: referenceImageBase64, mediaType: referenceImageMediaType };
+    }
     const res = await fetch('/api/generate-stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify(requestBody)
     });
 
     if (res.status === 401) { window.location.href = '/login.html'; return; }

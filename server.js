@@ -589,8 +589,17 @@ app.post('/api/generate', requireAuth, async (req, res) => {
 // Versi streaming dari /api/generate — AI ngirim hasil sedikit-sedikit,
 // jadi progress bar di frontend bisa ngikutin progress ASLI (bukan animasi kira-kira).
 app.post('/api/generate-stream', requireAuth, async (req, res) => {
-  const { prompt } = req.body || {};
+  const { prompt, referenceImage } = req.body || {};
   if (!prompt || !prompt.trim()) return res.status(400).json({ error: 'Prompt kosong' });
+
+  // referenceImage (kalau ada): { base64, mediaType } — batasi ukuran biar gak kebablasan
+  let image = null;
+  if (referenceImage && referenceImage.base64) {
+    if (referenceImage.base64.length > 7000000) {
+      return res.status(400).json({ error: 'Gambar referensi kegedean (maksimal ~5MB).' });
+    }
+    image = { base64: referenceImage.base64, mediaType: referenceImage.mediaType || 'image/png' };
+  }
 
   const org = await getOrg(req.user.orgId);
   if (!isOrgPro(org) && Number(org.token_balance) <= 0) {
@@ -611,7 +620,7 @@ app.post('/api/generate-stream', requireAuth, async (req, res) => {
   try {
     const { text: rawText, usage } = await generateHtmlFromPromptStream(prompt, (charCount) => {
       send({ type: 'progress', charCount });
-    });
+    }, image);
     const code = stripStrayFences(extractCode(rawText));
 
     if (!code || code.length < 20) {
