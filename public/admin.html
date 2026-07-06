@@ -101,10 +101,12 @@
     </div>
 
     <div class="panel-section">
-      <h2>Ganti Password</h2>
+      <h2>Ganti Username & Password</h2>
+      <label>Username Baru</label>
+      <input type="text" id="newUsernameInput" placeholder="Kosongkan kalau gak mau ganti" />
       <label>Password Baru</label>
-      <input type="password" id="newPasswordInput" placeholder="Minimal 4 karakter" />
-      <button class="btn" id="changePasswordBtn">Simpan Password Baru</button>
+      <input type="password" id="newPasswordInput" placeholder="Kosongkan kalau gak mau ganti (min. 4 karakter)" />
+      <button class="btn" id="changePasswordBtn">Simpan Perubahan</button>
       <div class="status-msg" id="passwordStatusMsg"></div>
     </div>
   </div>
@@ -268,21 +270,33 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 });
 
 document.getElementById('changePasswordBtn').addEventListener('click', async () => {
+  const newUser = document.getElementById('newUsernameInput').value.trim();
   const newPass = document.getElementById('newPasswordInput').value;
   const statusEl = document.getElementById('passwordStatusMsg');
-  if (!newPass || newPass.length < 4) {
+
+  if (!newUser && !newPass) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Isi salah satu (username atau password) dulu ya.';
+    return;
+  }
+  if (newPass && newPass.length < 4) {
     statusEl.style.display = 'block';
     statusEl.style.color = 'var(--danger)';
     statusEl.textContent = 'Password minimal 4 karakter.';
     return;
   }
+
   if (!siteData.design) siteData.design = {};
-  siteData.design.adminPassword = newPass;
+  if (newUser) siteData.design.adminUsername = newUser;
+  if (newPass) siteData.design.adminPassword = newPass;
+
   try {
     await saveSiteData(siteData);
     statusEl.style.display = 'block';
     statusEl.style.color = '#5eead4';
-    statusEl.textContent = 'Password berhasil diganti ✓';
+    statusEl.textContent = 'Berhasil disimpan ✓' + (newUser ? ' Username baru: ' + newUser + '.' : '') + ' Ingat baik-baik ya, dipakai buat login berikutnya.';
+    document.getElementById('newUsernameInput').value = '';
     document.getElementById('newPasswordInput').value = '';
   } catch (e) {
     statusEl.style.display = 'block';
