@@ -239,10 +239,11 @@
     <div style="padding:12px 14px 8px;border-bottom:1px solid var(--line);">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;">Workspace</div>
       <select id="workspaceSelect" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:7px 8px;border-radius:7px;font-size:12.5px;margin-bottom:8px;"></select>
-      <div style="display:flex;gap:6px;">
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
         <button class="btn" id="newWorkspaceBtn" style="flex:1;padding:6px;font-size:12px;">+ Workspace</button>
         <button class="btn" id="manageMembersBtn" style="flex:1;padding:6px;font-size:12px;">👥 Anggota</button>
       </div>
+      <button class="btn" id="manageDomainBtn" style="width:100%;padding:6px;font-size:12px;">🌐 Domain Kustom</button>
     </div>
     <h2>Halaman di Workspace Ini</h2>
     <div class="history-list" id="historyList">
@@ -332,6 +333,41 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="domainModal">
+  <div class="modal" style="width:460px;max-height:85vh;overflow-y:auto;">
+    <h3>🌐 Domain Kustom Workspace</h3>
+    <p style="font-size:12px;color:var(--muted);margin:-6px 0 14px;">1 domain per workspace, otomatis kepakai pas kamu publish halaman di workspace ini.</p>
+
+    <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px;">Domain (tanpa https://, tanpa www kalau gak perlu)</label>
+    <input type="text" id="workspaceDomainInput" placeholder="misal: exist-detailing.com" />
+    <div id="domainSaveResult" style="display:none;font-size:12px;margin-bottom:12px;padding:8px 10px;border-radius:7px;"></div>
+    <div class="row" style="margin-bottom:20px;">
+      <button class="btn" id="closeDomainBtn">Tutup</button>
+      <button class="btn primary" id="saveDomainBtn">Simpan Domain</button>
+    </div>
+
+    <div style="border-top:1px solid var(--line);padding-top:14px;">
+      <h4 style="font-size:13px;margin:0 0 10px;">📋 Cara pasang pakai Cloudflare (gratis)</h4>
+      <ol style="font-size:12px;color:var(--muted);line-height:1.8;padding-left:18px;margin:0;">
+        <li>Bikin akun gratis di <b style="color:var(--text);">cloudflare.com</b>, klik "Add a Site", masukin domain kamu.</li>
+        <li>Cloudflare bakal kasih 2 <b style="color:var(--text);">nameserver</b> (contoh: <code>ana.ns.cloudflare.com</code>). Copy itu.</li>
+        <li>Buka tempat kamu beli domain (Niagahoster, Rumahweb, GoDaddy, dll), cari menu "Nameserver" / "DNS", ganti nameserver-nya pakai punya Cloudflare tadi.</li>
+        <li>Balik ke Cloudflare, buka menu <b style="color:var(--text);">DNS</b>, tambah record baru:
+          <ul style="margin:6px 0;padding-left:16px;">
+            <li>Type: <b style="color:var(--text);">CNAME</b></li>
+            <li>Name: <b style="color:var(--text);">@</b> (atau <code>www</code> kalau mau pakai www)</li>
+            <li>Target: <b style="color:var(--text);" id="cnameTargetHint">(domain Railway kamu, cek di dashboard Railway)</b></li>
+            <li>Proxy status: pastikan <b style="color:var(--text);">awan ORANYE nyala</b> (Proxied) — ini kuncinya, biar SSL otomatis jalan tanpa perlu daftar manual ke Railway.</li>
+          </ul>
+        </li>
+        <li>Buka menu <b style="color:var(--text);">SSL/TLS</b> di Cloudflare, pilih mode <b style="color:var(--text);">"Full"</b>.</li>
+        <li>Tunggu 5-30 menit buat propagasi. Domain siap dipakai, SSL (https) otomatis aktif gratis dari Cloudflare.</li>
+      </ol>
+      <p style="font-size:11px;color:var(--muted);margin-top:12px;">💡 Kalau domainnya udah lama dipakai Cloudflare buat hal lain, cukup tambah record CNAME-nya aja (lewatin langkah ganti nameserver).</p>
+    </div>
+  </div>
+</div>
+
 <script>
 let currentType = 'react';
 const codeInput = document.getElementById('codeInput');
@@ -357,11 +393,14 @@ let currentSnippetId = null;    // snippet yang lagi dibuka dari riwayat (null k
 let currentSnippetPublish = null; // { slug, domain } kalau snippet ini udah pernah dipublish
 const workspaceSelect = document.getElementById('workspaceSelect');
 
+let currentWorkspacesList = [];
+
 async function loadWorkspaces(selectId){
   try {
     const res = await fetch('/api/workspaces');
     if (res.status === 401) { window.location.href = '/login.html'; return; }
     const list = await res.json();
+    currentWorkspacesList = list;
     workspaceSelect.innerHTML = '';
     if (list.length === 0) {
       workspaceSelect.innerHTML = '<option value="">Belum ada workspace</option>';
@@ -464,6 +503,43 @@ document.getElementById('manageMembersBtn').onclick = () => {
 document.getElementById('closeMembersBtn').onclick = () => {
   document.getElementById('membersModal').classList.remove('show');
 };
+
+// ---------- Domain Kustom Workspace ----------
+document.getElementById('manageDomainBtn').onclick = () => {
+  if (!currentWorkspaceId) { alert('Pilih/bikin workspace dulu ya.'); return; }
+  const ws = currentWorkspacesList.find(w => w.id === currentWorkspaceId);
+  document.getElementById('workspaceDomainInput').value = (ws && ws.customDomain) || '';
+  document.getElementById('domainSaveResult').style.display = 'none';
+  document.getElementById('cnameTargetHint').textContent = window.location.host;
+  document.getElementById('domainModal').classList.add('show');
+};
+document.getElementById('closeDomainBtn').onclick = () => {
+  document.getElementById('domainModal').classList.remove('show');
+};
+document.getElementById('saveDomainBtn').onclick = async () => {
+  const domain = document.getElementById('workspaceDomainInput').value.trim();
+  const resultBox = document.getElementById('domainSaveResult');
+  try {
+    const res = await fetch('/api/workspaces/' + currentWorkspaceId + '/domain', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customDomain: domain })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Gagal menyimpan domain');
+    resultBox.style.display = 'block';
+    resultBox.style.background = 'var(--accent-dim)';
+    resultBox.style.color = 'var(--accent)';
+    resultBox.textContent = domain ? 'Domain "' + domain + '" tersimpan ✓ Ikutin panduan di bawah buat setting DNS-nya.' : 'Domain dikosongkan, workspace ini gak pakai domain kustom lagi.';
+    loadWorkspaces(currentWorkspaceId);
+  } catch (e) {
+    resultBox.style.display = 'block';
+    resultBox.style.background = '#2a1010';
+    resultBox.style.color = '#ff9c9c';
+    resultBox.textContent = 'Gagal: ' + e.message;
+  }
+};
+
 document.getElementById('confirmInviteBtn').onclick = async () => {
   const email = document.getElementById('inviteEmailInput').value.trim();
   const password = document.getElementById('invitePasswordInput').value;
@@ -981,8 +1057,9 @@ document.getElementById('publishBtn').onclick = () => {
     return;
   }
 
+  const wsForDomain = currentWorkspacesList.find(w => w.id === currentWorkspaceId);
   document.getElementById('publishSlugInput').value = '';
-  document.getElementById('publishDomainInput').value = '';
+  document.getElementById('publishDomainInput').value = (wsForDomain && wsForDomain.customDomain) || '';
   document.getElementById('publishResult').style.display = 'none';
   document.getElementById('publishModal').classList.add('show');
 };

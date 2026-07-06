@@ -177,7 +177,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
 // ---------------------------------------------------------------------------
 app.get('/api/workspaces', requireAuth, async (req, res) => {
   const r = await pool.query(
-    `SELECT w.id, w.name, w.created_at AS "createdAt",
+    `SELECT w.id, w.name, w.created_at AS "createdAt", w.custom_domain AS "customDomain",
       COUNT(s.id)::int AS "pageCount",
       COUNT(s.id) FILTER (WHERE s.last_published_slug IS NOT NULL)::int AS "publishedCount",
       COUNT(s.id) FILTER (WHERE s.last_published_slug IS NULL)::int AS "draftCount"
@@ -186,6 +186,27 @@ app.get('/api/workspaces', requireAuth, async (req, res) => {
     [req.user.orgId]
   );
   res.json(r.rows);
+});
+
+// Simpan/ubah domain kustom buat 1 workspace (dipakai buat auto-isi pas publish, sekaligus catatan terpusat)
+app.put('/api/workspaces/:id/domain', requireAuth, async (req, res) => {
+  const { customDomain } = req.body || {};
+  const cleaned = (customDomain || '').trim().toLowerCase() || null;
+
+  if (cleaned) {
+    const taken = await pool.query(
+      'SELECT id FROM workspaces WHERE LOWER(custom_domain) = $1 AND id != $2',
+      [cleaned, req.params.id]
+    );
+    if (taken.rows[0]) return res.status(409).json({ error: 'Domain itu udah dipakai workspace lain.' });
+  }
+
+  const r = await pool.query(
+    'UPDATE workspaces SET custom_domain = $2 WHERE id = $1 AND org_id = $3 RETURNING id',
+    [req.params.id, cleaned, req.user.orgId]
+  );
+  if (r.rowCount === 0) return res.status(404).json({ error: 'Workspace tidak ditemukan' });
+  res.json({ ok: true, customDomain: cleaned });
 });
 
 app.post('/api/workspaces', requireAuth, async (req, res) => {
