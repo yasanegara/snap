@@ -108,6 +108,7 @@
   .skel-card{ flex:1; height:80px; }
   .settings-box{ background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:16px; }
 </style>
+<script src="/doc-builder.js"></script>
 </head>
 <body>
 
@@ -129,6 +130,15 @@
       <button class="btn" id="loadDraftBtn" style="flex:1;font-size:12.5px;padding:8px;">📂 Muat Draft</button>
     </div>
     <p class="hint" id="draftStatusHint" style="margin-top:-12px;margin-bottom:16px;"></p>
+
+    <div class="field">
+      <label>Format Output</label>
+      <select id="outputFormatSelect">
+        <option value="html">HTML Lengkap (langsung bisa publish sendiri)</option>
+        <option value="react">React (Komponen doang, dibungkus otomatis sama Studio)</option>
+      </select>
+      <p class="hint" style="margin-top:6px;">Pilih React kalau kamu mau kodenya lebih ringkas (gak perlu tulis ulang boilerplate HTML/CDN), soalnya itu udah otomatis disediain Studio.</p>
+    </div>
 
     <div class="field">
       <label>Nama Bisnis / Website</label>
@@ -549,6 +559,7 @@ function getActiveVals(containerId) {
 }
 
 function buildPromptText(){
+  const outputFormat = document.getElementById('outputFormatSelect').value;
   const bizName = document.getElementById('bizName').value.trim() || '(isi nama bisnis)';
   const bizType = document.getElementById('bizType').value.trim() || '(isi jenis bisnis)';
   const bizAudience = document.getElementById('bizAudience').value.trim() || '(isi target audiens)';
@@ -644,7 +655,22 @@ function buildPromptText(){
 '=====================================================\n' +
 'ATURAN TEKNIS WAJIB (JANGAN DIUBAH, INI KONTRAK PLATFORM):\n' +
 '=====================================================\n\n' +
-'1. STRUKTUR FILE\n' +
+(outputFormat === 'react' ?
+('1. STRUKTUR FILE (FORMAT REACT — KOMPONEN DOANG)\n' +
+'Tulis HANYA kode komponen React-nya aja (mulai dari `const App = () => {...}` atau semacamnya, sampai render-nya). JANGAN tulis <!DOCTYPE>, <html>, <head>, <body>, atau tag <script> pembungkus apa pun — semua itu OTOMATIS udah disediain platform (Tailwind CDN, React, ReactDOM, Babel semua udah otomatis ke-load), kamu CUKUP fokus ke komponennya aja.\n' +
+'JANGAN pakai import/export (langsung tulis komponennya), JANGAN pakai Firebase.\n\n' +
+'1b. SEO (LEWAT JAVASCRIPT, KARENA GAK ADA AKSES KE <head> LANGSUNG)\n' +
+'Di komponen utama, pakai `useEffect` yang jalan sekali pas awal buat set judul halaman & deskripsi, contoh pola:\n' +
+'```jsx\n' +
+'useEffect(() => {\n' +
+'  document.title = "Nama Bisnis - Jenis Layanan";\n' +
+'  let meta = document.querySelector(\'meta[name="description"]\');\n' +
+'  if (!meta) { meta = document.createElement("meta"); meta.name = "description"; document.head.appendChild(meta); }\n' +
+'  meta.content = "Deskripsi menarik maksimal 160 karakter";\n' +
+'}, []);\n' +
+'```\n\n')
+:
+('1. STRUKTUR FILE\n' +
 'Buat sebagai SATU file HTML utuh (<!DOCTYPE html> sampai </html>), dengan:\n' +
 '- Tailwind CSS lewat <script src="https://cdn.tailwindcss.com"><\/script>\n' +
 '- React 18 + ReactDOM lewat <script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script> dan react-dom versi UMD yang sama\n' +
@@ -660,7 +686,8 @@ function buildPromptText(){
 '- `<meta name="twitter:card" content="summary_large_image">` buat preview di Twitter/X\n' +
 '- 1 favicon sederhana pakai emoji, caranya: `<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚗</text></svg>">` (ganti emoji 🚗 sesuai jenis bisnisnya)\n' +
 '- `<meta name="viewport" content="width=device-width, initial-scale=1.0">` (biasanya udah ada, pastikan tetep ada)\n' +
-'CATATAN: og:title/og:description/og:image ini isinya teks statis di <head> (bukan dari siteData), soalnya perlu langsung kebaca tanpa nunggu JavaScript jalan.\n\n' +
+'CATATAN: og:title/og:description/og:image ini isinya teks statis di <head> (bukan dari siteData), soalnya perlu langsung kebaca tanpa nunggu JavaScript jalan.\n\n')
+) +
 '2. MODEL DATA\n' +
 'Semua konten yang bisa diedit (judul, teks, foto, dll) HARUS disimpan dalam SATU object bernama `defaultSiteData`, dengan struktur:\n' +
 '{\n' +
@@ -917,11 +944,14 @@ async function runGenerate(){
     stepTextEl.textContent = 'Selesai!';
 
     currentGeneratedCode = code;
+    const format = document.getElementById('outputFormatSelect').value;
     setTimeout(() => {
       document.getElementById('mainLayout').classList.add('full-preview');
       document.getElementById('promptOutput').style.display = 'none';
       document.getElementById('aiResultPane').style.display = 'block';
-      document.getElementById('aiPreviewFrame').srcdoc = wrapPreviewWithErrorOverlay(currentGeneratedCode);
+      document.getElementById('aiPreviewFrame').srcdoc = format === 'react'
+        ? buildReactDoc(currentGeneratedCode, { dataEndpointBase: '/api/data/', dataKey: hashCode(currentGeneratedCode.trim()) })
+        : wrapPreviewWithErrorOverlay(currentGeneratedCode);
       document.getElementById('saveResultBox').style.display = 'none';
       const bizName = document.getElementById('bizName').value.trim();
       document.getElementById('saveNameInput2').value = bizName || 'Project Baru';
@@ -1032,7 +1062,7 @@ document.getElementById('saveToWorkspaceBtn').addEventListener('click', async ()
     const res = await fetch('/api/snippets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, type: 'html', code: currentGeneratedCode, workspaceId })
+      body: JSON.stringify({ name, type: document.getElementById('outputFormatSelect').value, code: currentGeneratedCode, workspaceId })
     });
     const data = await res.json();
 
