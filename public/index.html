@@ -746,11 +746,19 @@ async function republishExisting(){
       ? buildReactDoc(code, { dataEndpointBase: '/api/public-data/', dataKey: slug })
       : buildHtmlDoc(code, { dataEndpointBase: '/api/public-data/', dataKey: slug });
 
+    // Ambil data terbaru (termasuk seo) dari preview yang lagi jalan, biar tag SEO ikut ke-update
+    let initialData = {};
+    try {
+      const projectId = hashCode(code.trim());
+      const dataRes = await fetch('/api/data/' + encodeURIComponent(projectId));
+      if (dataRes.ok) initialData = await dataRes.json();
+    } catch (e) { /* gapapa */ }
+
     const res = await fetch('/api/publish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        slug, customDomain: currentSnippetPublish.domain || null, html, type: currentType,
+        slug, customDomain: currentSnippetPublish.domain || null, html, type: currentType, initialData,
         workspaceId: currentWorkspaceId, snippetId: currentSnippetId
       })
     });

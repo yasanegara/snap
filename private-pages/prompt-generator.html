@@ -647,16 +647,8 @@ function buildPromptText(){
 ('1. STRUKTUR FILE (FORMAT REACT — KOMPONEN DOANG)\n' +
 'Tulis HANYA kode komponen React-nya aja (mulai dari `const App = () => {...}` atau semacamnya, sampai render-nya). JANGAN tulis <!DOCTYPE>, <html>, <head>, <body>, atau tag <script> pembungkus apa pun — semua itu OTOMATIS udah disediain platform (Tailwind CDN, React, ReactDOM, Babel semua udah otomatis ke-load), kamu CUKUP fokus ke komponennya aja.\n' +
 'JANGAN pakai import/export (langsung tulis komponennya), JANGAN pakai Firebase.\n\n' +
-'1b. SEO (LEWAT JAVASCRIPT, KARENA GAK ADA AKSES KE <head> LANGSUNG)\n' +
-'Di komponen utama, pakai `useEffect` yang jalan sekali pas awal buat set judul halaman & deskripsi, contoh pola:\n' +
-'```jsx\n' +
-'useEffect(() => {\n' +
-'  document.title = "Nama Bisnis - Jenis Layanan";\n' +
-'  let meta = document.querySelector(\'meta[name="description"]\');\n' +
-'  if (!meta) { meta = document.createElement("meta"); meta.name = "description"; document.head.appendChild(meta); }\n' +
-'  meta.content = "Deskripsi menarik maksimal 160 karakter";\n' +
-'}, []);\n' +
-'```\n\n')
+'1b. SOAL SEO/THUMBNAIL: GAK PERLU DIPIKIRIN DI SINI\n' +
+'Platform ini yang otomatis masangin title/meta/thumbnail pas halamannya di-publish, ambil dari `defaultSiteData.seo` (lihat poin 2 di bawah). Kamu CUKUP isi field `seo` itu dengan benar, JANGAN coba-coba nulis `document.title` atau bikin tag `<meta>` manual pakai JavaScript — itu gak bakal kebaca sama WhatsApp/Facebook (mereka gak jalanin JavaScript pas ambil preview link).\n\n')
 :
 ('1. STRUKTUR FILE\n' +
 'Buat sebagai SATU file HTML utuh (<!DOCTYPE html> sampai </html>), dengan:\n' +
@@ -665,24 +657,24 @@ function buildPromptText(){
 '- Babel Standalone lewat <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>\n' +
 '- Semua komponen React ditulis di dalam SATU <script type="text/babel"> di akhir <body>\n' +
 '- JANGAN pakai import/export, JANGAN pakai file terpisah, JANGAN pakai Firebase\n\n' +
-'1b. SEO, META TAG, DAN THUMBNAIL (WAJIB ADA DI <head>)\n' +
-'Tambahkan tag-tag berikut di <head>, isinya SESUAI nama bisnis, jenis bisnis, dan target audiens di atas (jangan generic/asal):\n' +
-'- `<title>` yang deskriptif, isinya nama bisnis + jenis layanan (contoh: "Exist Auto Detailing - Detailing Mobil Premium Sleman")\n' +
-'- `<meta name="description" content="...">` — 1 kalimat menarik yang jelasin apa yang ditawarkan (maksimal 160 karakter)\n' +
-'- `<meta property="og:title" content="...">`, `<meta property="og:description" content="...">`, `<meta property="og:type" content="website">` — buat preview kalau link-nya dibagi ke WhatsApp/Facebook/dll\n' +
-'- `<meta property="og:image" content="...">` — WAJIB isi pakai URL foto hero/utama-nya (dipakai sebagai thumbnail pas link dibagikan)\n' +
-'- `<meta name="twitter:card" content="summary_large_image">` buat preview di Twitter/X\n' +
-'- 1 favicon sederhana pakai emoji, caranya: `<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚗</text></svg>">` (ganti emoji 🚗 sesuai jenis bisnisnya)\n' +
-'- `<meta name="viewport" content="width=device-width, initial-scale=1.0">` (biasanya udah ada, pastikan tetep ada)\n' +
-'CATATAN: og:title/og:description/og:image ini isinya teks statis di <head> (bukan dari siteData), soalnya perlu langsung kebaca tanpa nunggu JavaScript jalan.\n\n')
+'1b. SEO DI <head> (BUAT JAGA-JAGA SEBELUM DI-PUBLISH)\n' +
+'Tambahkan juga tag ini langsung di <head> (isinya HARUS SAMA PERSIS kayak `defaultSiteData.seo` yang kamu isi di poin 2, biar konsisten):\n' +
+'- `<title>` dari `seo.title`\n' +
+'- `<meta name="description" content="...">` dari `seo.description`\n' +
+'- `<meta property="og:title">`, `<meta property="og:description">`, `<meta property="og:type" content="website">`, `<meta property="og:image">` dari `seo.image`\n' +
+'- `<meta name="twitter:card" content="summary_large_image">`\n' +
+'- 1 favicon sederhana pakai emoji, caranya: `<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚗</text></svg>">` (ganti emoji sesuai jenis bisnisnya)\n' +
+'CATATAN: tag di <head> ini cuma jaga-jaga sebelum sempat di-publish. Platform akan OTOMATIS menimpanya pakai data dari `defaultSiteData.seo` pas halamannya di-publish, jadi yang paling penting itu isi `seo` di poin 2 dengan benar.\n\n')
 ) +
 '2. MODEL DATA\n' +
 'Semua konten yang bisa diedit (judul, teks, foto, dll) HARUS disimpan dalam SATU object bernama `defaultSiteData`, dengan struktur:\n' +
 '{\n' +
+'  seo: { title: "Nama Bisnis - Jenis Layanan (SEO-friendly)", description: "Kalimat menarik maksimal 160 karakter", image: "https://url-foto-asli.com/foto.jpg" },\n' +
 '  design: { ctaColor: "...", ctaHoverColor: "...", ctaTextColor: "..." },\n' +
 '  sectionOrder: ["hero", "about", ...],\n' +
 '  sections: { hero: { visible: true, title: "...", image: "...", ... }, about: {...}, ... }\n' +
 '}\n' +
+'PENTING soal `seo.image`: HARUS berupa URL foto yang BENERAN VALID dan bisa diakses publik (misal dari unsplash.com atau placehold.co), JANGAN PERNAH base64 — base64 gak bisa dibaca WhatsApp/Facebook buat bikin thumbnail pas link dibagikan. Boleh sama dengan foto hero, atau foto lain yang representatif.\n' +
 'Setiap section punya field `visible` (boolean) buat sembunyikan/tampilkan.\n\n' +
 '2b. TANDA ELEMEN YANG BISA DIEDIT LANGSUNG (WAJIB)\n' +
 'Setiap elemen JSX yang menampilkan isi dari `siteData` (judul, teks, gambar, dll) WAJIB dikasih atribut `data-edit` berisi path menuju datanya, dan `data-edit-type` sesuai jenisnya ("text" buat judul singkat, "textarea" buat paragraf panjang, "image" buat gambar). Contoh:\n' +

@@ -416,6 +416,36 @@ app.get('/api/publish', requireAuth, async (req, res) => {
   res.json(r.rows);
 });
 
+// Suntik/timpa tag SEO (title, description, Open Graph, Twitter Card) ke <head>.
+// Dipanggil pas publish, biar SELALU ada di HTML mentah (bukan lewat JavaScript) —
+// soalnya WhatsApp/Facebook/Twitter cuma baca HTML mentah, gak jalanin JS pas ambil preview link.
+function injectSeoMetaTags(html, seo, pageUrl) {
+  if (!seo || (!seo.title && !seo.description && !seo.image)) return html;
+
+  const esc = (s) => String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const title = esc(seo.title || 'Website');
+  const description = esc(seo.description || '');
+  const image = seo.image && !seo.image.startsWith('data:') ? seo.image : ''; // base64 gak bisa dipakai crawler, jadi diabaikan
+
+  let tags = '';
+  if (title) tags += `<title>${title}</title>\n`;
+  if (description) tags += `<meta name="description" content="${description}">\n`;
+  if (title) tags += `<meta property="og:title" content="${title}">\n`;
+  if (description) tags += `<meta property="og:description" content="${description}">\n`;
+  tags += `<meta property="og:type" content="website">\n`;
+  if (pageUrl) tags += `<meta property="og:url" content="${esc(pageUrl)}">\n`;
+  if (image) tags += `<meta property="og:image" content="${esc(image)}">\n<meta name="twitter:card" content="summary_large_image">\n`;
+
+  // Buang <title> lama (kalau ada) biar gak dobel, baru sisipin tag baru tepat setelah <head>
+  let result = html.replace(/<title>[\s\S]*?<\/title>/i, '');
+  if (/<head[^>]*>/i.test(result)) {
+    result = result.replace(/<head[^>]*>/i, (m) => m + '\n' + tags);
+  } else {
+    result = tags + result;
+  }
+  return result;
+}
+
 app.post('/api/publish', requireAuth, async (req, res) => {
   const { slug, customDomain, html, type, initialData, workspaceId, snippetId } = req.body || {};
   if (!slug || !SLUG_PATTERN.test(slug)) {
@@ -439,12 +469,17 @@ app.post('/api/publish', requireAuth, async (req, res) => {
     }
   }
 
+  // Kalau AI nyediain data SEO (defaultSiteData.seo), suntikkan ke <head> biar dijamin ada & valid buat crawler
+  const seoData = initialData && initialData.seo;
+  const pageUrl = customDomain ? ('https://' + customDomain) : null; // slug-based URL diisi client (belum tau domain servernya dari sini)
+  const finalHtml = seoData ? injectSeoMetaTags(html, seoData, pageUrl) : html;
+
   const now = Date.now();
   await pool.query(
     `INSERT INTO publishes (slug, org_id, workspace_id, custom_domain, html, type, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      ON CONFLICT (slug) DO UPDATE SET custom_domain = $4, html = $5, type = $6, updated_at = $8`,
-    [slug, req.user.orgId, workspaceId || null, customDomain || null, html, type || 'react', existing ? existing.created_at : now, now]
+    [slug, req.user.orgId, workspaceId || null, customDomain || null, finalHtml, type || 'react', existing ? existing.created_at : now, now]
   );
 
   if (!existing && initialData) {
