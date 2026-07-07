@@ -330,66 +330,73 @@
       statusDiv.style.color = '#666';
       statusDiv.textContent = 'Menunggu AI...';
 
-      // Pesan berganti-ganti biar keliatan masih proses, bukan macet
-      // (beberapa model AI "reasoning" emang butuh waktu lebih lama, mikir dulu diam-diam)
-      var waitMessages = [
-        'Menunggu AI...',
-        'AI masih mikir, ini wajar kalau pakai model reasoning...',
-        'Masih diproses, mohon tunggu sebentar lagi...',
-        'Hampir kelar, AI lagi nyusun jawaban...'
-      ];
-      var waitMsgIndex = 0;
-      var waitTimer = setInterval(function(){
-        waitMsgIndex = Math.min(waitMsgIndex + 1, waitMessages.length - 1);
-        statusDiv.textContent = waitMessages[waitMsgIndex];
-      }, 8000);
-
       var currentSiteData = window.__getSiteData();
       var currentSectionData = currentSiteData.sections[sectionName];
+      var streamEndpoint = window.__aiEditEndpoint.replace('/api/edit-section', '/api/edit-section-stream');
 
-      fetch(window.__aiEditEndpoint, {
+      function finishWithError(msg){
+        statusDiv.style.color = '#c00';
+        statusDiv.textContent = msg;
+        sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
+      }
+
+      fetch(streamEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentData: currentSectionData, instruction: instruction })
-      }).then(function(r){
-        return r.text().then(function(rawText){
-          var data;
-          try {
-            data = JSON.parse(rawText);
-          } catch (e) {
-            // Server/infrastruktur di belakangnya lagi ada gangguan sesaat, balikin pesan yang jelas
-            throw new Error('Server lagi ada gangguan sesaat (bukan salah instruksi kamu). Coba lagi beberapa saat lagi.');
-          }
-          return { status: r.status, ok: r.ok, data: data };
-        });
-      }).then(function(result){
-        clearInterval(waitTimer);
-        if (result.status === 402) {
-          statusDiv.style.color = '#c00';
-          statusDiv.textContent = result.data.error || 'Token AI habis.';
-          sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
-          return;
+      }).then(function(res){
+        if (res.status === 402) {
+          return res.json().then(function(data){ finishWithError(data.error || 'Token AI habis.'); });
         }
-        if (!result.ok) {
-          statusDiv.style.color = '#c00';
-          statusDiv.textContent = 'Gagal: ' + (result.data.error || 'error tidak diketahui');
-          sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
-          return;
+        if (!res.ok || !res.body) {
+          return res.text().then(function(rawText){
+            var data; try { data = JSON.parse(rawText); } catch (e) { data = {}; }
+            finishWithError('Gagal: ' + (data.error || 'Server lagi ada gangguan sesaat. Coba lagi.'));
+          });
         }
-        window.__setSiteData(function(prev){
-          var next = JSON.parse(JSON.stringify(prev));
-          next.sections[sectionName] = result.data.data;
-          return next;
-        });
-        statusDiv.style.color = '#0a7a4a';
-        statusDiv.textContent = 'Berhasil diupdate ✓';
-        if (window.parent) window.parent.postMessage({ type: 'ai-section-edited', sectionName: sectionName }, '*');
-        setTimeout(function(){ pop.remove(); }, 1000);
+
+        var reader = res.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function readChunk(){
+          reader.read().then(function(result){
+            if (result.done) return;
+            buffer += decoder.decode(result.value, { stream: true });
+            var parts = buffer.split('\n\n');
+            buffer = parts.pop();
+
+            parts.forEach(function(part){
+              var line = part.trim();
+              if (line.indexOf('data:') !== 0) return;
+              var evt;
+              try { evt = JSON.parse(line.slice(5).trim()); } catch (e) { return; }
+
+              if (evt.type === 'progress') {
+                statusDiv.textContent = 'AI lagi nulis... (' + evt.charCount.toLocaleString('id-ID') + ' karakter)';
+              } else if (evt.type === 'done') {
+                window.__setSiteData(function(prev){
+                  var next = JSON.parse(JSON.stringify(prev));
+                  next.sections[sectionName] = evt.data;
+                  return next;
+                });
+                statusDiv.style.color = '#0a7a4a';
+                statusDiv.textContent = 'Berhasil diupdate ✓';
+                if (window.parent) window.parent.postMessage({ type: 'ai-section-edited', sectionName: sectionName }, '*');
+                setTimeout(function(){ pop.remove(); }, 1000);
+              } else if (evt.type === 'error') {
+                finishWithError('Gagal: ' + evt.error);
+              }
+            });
+
+            readChunk();
+          }).catch(function(e){
+            finishWithError('Gagal: koneksi terputus. Coba lagi.');
+          });
+        }
+        readChunk();
       }).catch(function(e){
-        clearInterval(waitTimer);
-        statusDiv.style.color = '#c00';
-        statusDiv.textContent = 'Gagal: ' + e.message;
-        sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
+        finishWithError('Gagal: ' + e.message);
       });
     };
 

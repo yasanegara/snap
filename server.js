@@ -785,6 +785,69 @@ app.post('/api/edit-section', requireAuth, async (req, res) => {
   }
 });
 
+// Versi streaming dari /api/edit-section — sama kayak /api/generate-stream, biar progress
+// yang ditampilkan di popover "Edit Section" itu beneran (bukan cuma pesan muter-muter doang).
+app.post('/api/edit-section-stream', requireAuth, async (req, res) => {
+  const { currentData, instruction } = req.body || {};
+  if (!currentData) return res.status(400).json({ error: 'Data section kosong' });
+  if (!instruction || !instruction.trim()) return res.status(400).json({ error: 'Isi dulu instruksi perubahannya' });
+
+  const org = await getOrg(req.user.orgId);
+  if (!isOrgPro(org) && Number(org.token_balance) <= 0) {
+    return res.status(402).json({
+      error: 'Token AI kamu sudah habis. Minta tambahan token ke admin platform, atau upgrade ke Pro buat token tanpa batas.',
+      upgradeRequired: true
+    });
+  }
+
+  const editPrompt =
+    'Ini data JSON sebuah website (struktur siteData React):\n\n' +
+    JSON.stringify(currentData, null, 2) + '\n\n' +
+    'Tolong ubah data di atas sesuai instruksi berikut: "' + instruction.trim() + '"\n\n' +
+    'ATURAN WAJIB (PENTING BANGET):\n' +
+    '- Balikin CUMA objek JSON mentah hasil yang sudah diupdate. JANGAN pakai pembungkus ```json atau ``` apa pun. JANGAN kasih kalimat pembuka/penutup/penjelasan sama sekali.\n' +
+    '- Jawaban kamu HARUS langsung dimulai dengan tanda { dan langsung diakhiri dengan tanda }.\n' +
+    '- JANGAN mengubah struktur/nama field yang sudah ada (jangan tambah/hapus field).\n' +
+    '- Field yang gak disebut di instruksi, biarkan nilainya sama persis seperti semula.\n' +
+    '- Untuk field gambar (biasanya namanya mengandung kata "image" atau "logo"), JANGAN diubah nilainya sama sekali kecuali diminta secara eksplisit.';
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  const send = (obj) => res.write('data: ' + JSON.stringify(obj) + '\n\n');
+
+  try {
+    const { text: rawText, usage } = await generateHtmlFromPromptStream(editPrompt, (charCount) => {
+      send({ type: 'progress', charCount });
+    });
+    const updatedData = extractJSONObject(rawText);
+
+    if (updatedData === undefined) {
+      send({ type: 'error', error: 'AI membalas dengan format yang gak valid. Coba instruksi yang lebih spesifik/sederhana, atau coba lagi. (Token gak kepotong buat percobaan yang gagal ini.)' });
+      return res.end();
+    }
+
+    const tokensUsed2 = usage.inputTokens + usage.outputTokens;
+    await pool.query(
+      `UPDATE orgs SET
+        ai_input_tokens_used = ai_input_tokens_used + $2,
+        ai_output_tokens_used = ai_output_tokens_used + $3,
+        token_balance = GREATEST(token_balance - $4, 0)
+       WHERE id = $1`,
+      [req.user.orgId, usage.inputTokens, usage.outputTokens, tokensUsed2]
+    );
+
+    send({ type: 'done', data: updatedData });
+    res.end();
+  } catch (e) {
+    send({ type: 'error', error: e.message });
+    res.end();
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Billing (Midtrans)
 // ---------------------------------------------------------------------------
