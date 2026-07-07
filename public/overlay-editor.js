@@ -197,6 +197,33 @@
     label.style.cssText = 'font-size:11px;color:#666;margin-bottom:8px;font-weight:600;word-break:break-all;';
     pop.appendChild(label);
 
+    // Kalau elemen yang diklik itu <a> (biasanya tombol CTA), tampilkan juga kotak buat edit link tujuannya.
+    // Nebak nama field link-nya dari pola nama: "...Text" -> "...Link" (misal ctaText -> ctaLink).
+    var isLinkElement = el.tagName === 'A';
+    var linkPath = isLinkElement ? path.replace(/Text$/i, 'Link') : null;
+    var hasDedicatedLinkField = isLinkElement && linkPath !== path;
+    var linkInput = null;
+
+    if (hasDedicatedLinkField) {
+      var linkLabel = document.createElement('div');
+      linkLabel.textContent = '🔗 Link Tujuan';
+      linkLabel.style.cssText = 'font-size:11px;color:#666;margin-bottom:4px;font-weight:600;';
+      pop.appendChild(linkLabel);
+
+      linkInput = document.createElement('input');
+      linkInput.type = 'text';
+      const currentLinkValue = getByPath(window.__getSiteData(), linkPath);
+      linkInput.value = currentLinkValue || el.getAttribute('href') || '';
+      linkInput.placeholder = 'misal: https://wa.me/62812xxxx, #kontak, /halaman-lain';
+      linkInput.style.cssText = 'width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;font-size:12.5px;margin-bottom:10px;box-sizing:border-box;color:#111;background:#fff;';
+      pop.appendChild(linkInput);
+
+      var textFieldLabel = document.createElement('div');
+      textFieldLabel.textContent = '✏️ Teks Tombol';
+      textFieldLabel.style.cssText = 'font-size:11px;color:#666;margin-bottom:4px;font-weight:600;';
+      pop.appendChild(textFieldLabel);
+    }
+
     var input;
     if (type === 'image') {
       var preview = document.createElement('img');
@@ -241,7 +268,13 @@
         };
         reader.readAsDataURL(file);
       } else {
-        window.__setSiteData(function(prev){ return setByPath(prev, path, input.value); });
+        window.__setSiteData(function(prev){
+          var next = setByPath(prev, path, input.value);
+          if (hasDedicatedLinkField && linkInput) {
+            next = setByPath(next, linkPath, linkInput.value);
+          }
+          return next;
+        });
         pop.remove();
       }
     };

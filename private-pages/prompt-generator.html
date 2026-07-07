@@ -686,6 +686,13 @@ function buildPromptText(){
 'Untuk item dalam daftar (misal testimoni, harga), path-nya pakai index array, contoh: `sections.testimonials.items.0.nama`. Atribut ini WAJIB ada di semua elemen konten yang bisa diedit, supaya platform bisa menyediakan mode edit klik-langsung buat pengguna awam.\n\n' +
 '2c. ID SECTION (WAJIB, PENTING BANGET)\n' +
 'Setiap elemen <section> (atau pembungkus utama tiap section) WAJIB dikasih atribut `id` yang SAMA PERSIS dengan namanya di `sectionOrder`. Contoh: kalau di sectionOrder ada "hero", maka wajib ada `<section id="hero">...</section>`. Ini WAJIB ada di SEMUA section tanpa kecuali (termasuk hero, about, contact, dll), soalnya platform butuh ini buat nyediain tombol "Edit dengan AI" otomatis di tiap section. Kalau id-nya beda/gak ada, tombol itu gak akan muncul.\n\n' +
+'2d. TOMBOL CTA (Call-to-Action) — WAJIB BISA DIEDIT TEKS *DAN* LINK-NYA\n' +
+'Untuk SEMUA tombol/link yang mengarah ke tempat lain (tombol "Booking Sekarang", "Chat WhatsApp", "Lihat Menu", dll), datanya WAJIB punya 2 field terpisah dengan pola nama PERSIS seperti ini: kalau teksnya namanya `xxxText` (misal `ctaText`), field link-nya HARUS dinamain `xxxLink` (misal `ctaLink`) — akhiran "Text"/"Link" ini WAJIB PERSIS, jangan diganti nama lain (jangan `ctaUrl`, jangan `ctaHref`, dll), soalnya platform nebak field link dari pola nama ini.\n' +
+'Contoh JSX yang benar:\n' +
+'```jsx\n' +
+'<a href={data.ctaLink} data-edit="sections.hero.ctaText" data-edit-type="text">{data.ctaText}</a>\n' +
+'```\n' +
+'Dengan data section-nya: `{ ctaText: "Booking Sekarang", ctaLink: "https://wa.me/62812xxxx" }`. Kalau ada beberapa tombol CTA dalam 1 section (misal beberapa paket harga, masing-masing punya tombol beli sendiri), tetap pakai pola yang sama per item (misal `items[0].ctaText` + `items[0].ctaLink`).\n\n' +
 '3. KOMPONEN App HARUS PAKAI STATE INI (SALIN PERSIS, JANGAN DIUBAH LOGIKANYA):\n\n' +
 '```jsx\n' + contractHooks + '\n```\n\n' +
 'Taruh kode di atas di paling awal komponen `App`, sebelum logic lainnya. `saveStatus` ini CUKUP disimpan sebagai state internal, JANGAN ditampilkan di mana pun di halaman (jangan bikin teks/badge "Tersimpan"/"Menyimpan..." yang keliatan pengunjung) — platform ini udah nyediain notifikasi simpan sendiri lewat fitur klik-edit-nya.\n\n' +

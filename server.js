@@ -416,25 +416,56 @@ app.get('/api/publish', requireAuth, async (req, res) => {
   res.json(r.rows);
 });
 
-// Suntik/timpa tag SEO (title, description, Open Graph, Twitter Card) ke <head>.
+// Cari 1 URL foto yang VALID (bukan base64) di seluruh data situs, dipakai sebagai
+// cadangan kalau seo.image kosong/rusak — biar thumbnail tetep ada walau AI-nya lupa isi.
+function findFallbackImage(siteData) {
+  if (!siteData || !siteData.sections) return '';
+  const isValidUrl = (v) => typeof v === 'string' && /^https?:\/\//i.test(v);
+  // urutan prioritas: hero duluan, baru section lain
+  const order = (siteData.sectionOrder || Object.keys(siteData.sections));
+  for (const key of order) {
+    const section = siteData.sections[key];
+    if (section && isValidUrl(section.image)) return section.image;
+  }
+  // masih gak ketemu, sisir semua nilai string di semua section
+  for (const key in siteData.sections) {
+    const section = siteData.sections[key];
+    if (!section || typeof section !== 'object') continue;
+    for (const v of Object.values(section)) {
+      if (isValidUrl(v)) return v;
+    }
+  }
+  return '';
+}
+
+// Suntik/timpa tag SEO (title, description, Open Graph, Twitter Card, dll) ke <head>.
 // Dipanggil pas publish, biar SELALU ada di HTML mentah (bukan lewat JavaScript) —
 // soalnya WhatsApp/Facebook/Twitter cuma baca HTML mentah, gak jalanin JS pas ambil preview link.
-function injectSeoMetaTags(html, seo, pageUrl) {
-  if (!seo || (!seo.title && !seo.description && !seo.image)) return html;
+function injectSeoMetaTags(html, siteData, pageUrl) {
+  const seo = siteData && siteData.seo;
+  if (!seo && !(siteData && siteData.sections)) return html;
 
   const esc = (s) => String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const title = esc(seo.title || 'Website');
-  const description = esc(seo.description || '');
-  const image = seo.image && !seo.image.startsWith('data:') ? seo.image : ''; // base64 gak bisa dipakai crawler, jadi diabaikan
+  const title = esc((seo && seo.title) || 'Website');
+  const description = esc((seo && seo.description) || '');
+
+  // Kalau seo.image kosong/base64, cari cadangan dari section lain sebelum nyerah
+  let image = (seo && seo.image && !seo.image.startsWith('data:')) ? seo.image : '';
+  if (!image) image = findFallbackImage(siteData);
 
   let tags = '';
   if (title) tags += `<title>${title}</title>\n`;
   if (description) tags += `<meta name="description" content="${description}">\n`;
-  if (title) tags += `<meta property="og:title" content="${title}">\n`;
+  tags += `<meta name="robots" content="index, follow">\n`;
+  if (title) tags += `<meta property="og:title" content="${title}">\n<meta property="og:site_name" content="${title}">\n`;
   if (description) tags += `<meta property="og:description" content="${description}">\n`;
-  tags += `<meta property="og:type" content="website">\n`;
-  if (pageUrl) tags += `<meta property="og:url" content="${esc(pageUrl)}">\n`;
-  if (image) tags += `<meta property="og:image" content="${esc(image)}">\n<meta name="twitter:card" content="summary_large_image">\n`;
+  tags += `<meta property="og:type" content="website">\n<meta property="og:locale" content="id_ID">\n`;
+  if (pageUrl) tags += `<meta property="og:url" content="${esc(pageUrl)}">\n<link rel="canonical" href="${esc(pageUrl)}">\n`;
+  if (image) {
+    tags += `<meta property="og:image" content="${esc(image)}">\n`;
+    tags += `<meta property="og:image:secure_url" content="${esc(image)}">\n`;
+    tags += `<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:image" content="${esc(image)}">\n`;
+  }
 
   // Buang <title> lama (kalau ada) biar gak dobel, baru sisipin tag baru tepat setelah <head>
   let result = html.replace(/<title>[\s\S]*?<\/title>/i, '');
@@ -469,10 +500,10 @@ app.post('/api/publish', requireAuth, async (req, res) => {
     }
   }
 
-  // Kalau AI nyediain data SEO (defaultSiteData.seo), suntikkan ke <head> biar dijamin ada & valid buat crawler
-  const seoData = initialData && initialData.seo;
+  // Suntikkan tag SEO ke <head>, dijamin ada & valid buat crawler.
+  // Kirim seluruh initialData (bukan cuma .seo) biar ada cadangan cari gambar dari section lain kalau perlu.
   const pageUrl = customDomain ? ('https://' + customDomain) : null; // slug-based URL diisi client (belum tau domain servernya dari sini)
-  const finalHtml = seoData ? injectSeoMetaTags(html, seoData, pageUrl) : html;
+  const finalHtml = initialData ? injectSeoMetaTags(html, initialData, pageUrl) : html;
 
   const now = Date.now();
   await pool.query(
