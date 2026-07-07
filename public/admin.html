@@ -246,7 +246,15 @@ document.getElementById('backToSiteLink').addEventListener('click', (e) => {
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
   sessionStorage.removeItem(SESSION_KEY);
-  window.location.reload();
+
+  // Coba cari alamat halaman depan situs ini dari endpoint-nya, biar abis logout balik ke situsnya
+  // (bukan ke layar login admin lagi)
+  const publicDataMatch = endpoint && endpoint.match(/\/api\/public-data\/([^/?]+)/);
+  if (publicDataMatch) {
+    window.location.href = '/p/' + publicDataMatch[1];
+  } else {
+    window.location.href = '/';
+  }
 });
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
