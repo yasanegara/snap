@@ -271,6 +271,7 @@
     <div class="preview-pane">
       <div class="pane-toolbar">
         <span style="font-size:12px;color:var(--muted);">Preview</span>
+        <a id="viewLiveLink" href="#" target="_blank" style="display:none;font-size:12px;color:var(--accent);text-decoration:none;font-weight:600;">🌐 Lihat Halaman Live ↗</a>
         <div class="spacer"></div>
         <button class="btn" id="openTabBtn">Buka di tab baru</button>
         <button class="btn" id="resetDataBtn" title="Hapus semua data hasil edit di preview (kembali ke data awal kode)">Reset data</button>
@@ -692,14 +693,23 @@ function slugify(s){
 function updatePublishButtonState(){
   const btn = document.getElementById('publishBtn');
   const asNewBtn = document.getElementById('publishAsNewBtn');
+  const viewLiveLink = document.getElementById('viewLiveLink');
   if (currentSnippetPublish && currentSnippetPublish.slug) {
     btn.textContent = '🔄 Update Publikasi';
     btn.title = 'Update halaman live yang sudah ada (/p/' + currentSnippetPublish.slug + ') pakai kode terbaru, tanpa isi ulang slug';
     asNewBtn.style.display = 'inline-block';
+    // Kalau workspace-nya punya domain kustom, pakai itu; kalau enggak, pakai link /p/slug bawaan
+    const ws = currentWorkspacesList.find(w => w.id === currentWorkspaceId);
+    const liveUrl = (ws && ws.customDomain)
+      ? ('https://' + ws.customDomain)
+      : (window.location.origin + '/p/' + currentSnippetPublish.slug);
+    viewLiveLink.href = liveUrl;
+    viewLiveLink.style.display = 'inline-block';
   } else {
     btn.textContent = '🚀 Publish';
     btn.title = '';
     asNewBtn.style.display = 'none';
+    viewLiveLink.style.display = 'none';
   }
 }
 
