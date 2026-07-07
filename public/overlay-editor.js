@@ -352,7 +352,16 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentData: currentSectionData, instruction: instruction })
       }).then(function(r){
-        return r.json().then(function(data){ return { status: r.status, ok: r.ok, data: data }; });
+        return r.text().then(function(rawText){
+          var data;
+          try {
+            data = JSON.parse(rawText);
+          } catch (e) {
+            // Server/infrastruktur di belakangnya lagi ada gangguan sesaat, balikin pesan yang jelas
+            throw new Error('Server lagi ada gangguan sesaat (bukan salah instruksi kamu). Coba lagi beberapa saat lagi.');
+          }
+          return { status: r.status, ok: r.ok, data: data };
+        });
       }).then(function(result){
         clearInterval(waitTimer);
         if (result.status === 402) {
