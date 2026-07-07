@@ -169,6 +169,8 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+let currentLimits = null;
+
 async function loadAccountInfo(){
   try {
     const res = await fetch('/api/me');
@@ -177,6 +179,7 @@ async function loadAccountInfo(){
 
     document.getElementById('accOrgName').textContent = me.org ? me.org.name : '-';
     document.getElementById('accRole').textContent = me.role === 'owner' ? '👑 Owner' : '👤 Member';
+    currentLimits = me.limits || null;
 
     if (me.org && me.org.plan === 'pro') {
       document.getElementById('accPlan').textContent = '⭐ Pro';
@@ -187,6 +190,9 @@ async function loadAccountInfo(){
       const total = me.limits ? Number(me.limits.includedTokens) : 0;
       document.getElementById('accToken').textContent = balance.toLocaleString('id-ID') + ' / ' + total.toLocaleString('id-ID');
     }
+
+    // Kartu workspace butuh angka batas ini juga, refresh sekarang udah tau
+    loadWorkspaceCards();
   } catch (e) {
     document.getElementById('accOrgName').textContent = 'Gagal memuat';
   }
@@ -211,6 +217,8 @@ async function loadWorkspaceCards(){
             <span>🌐 Publish <b>${ws.publishedCount}</b></span>
             <span>·</span>
             <span>📝 Draft <b>${ws.draftCount}</b></span>
+            <span>·</span>
+            <span>📄 Halaman <b>${ws.pageCount}${currentLimits ? '/' + currentLimits.maxPagesPerWorkspace : ''}</b></span>
           </div>
           <div class="ws-actions">
             <button class="btn primary" data-action="studio">Buka Studio</button>

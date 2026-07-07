@@ -379,6 +379,7 @@ const previewFrame = document.getElementById('previewFrame');
 const historyList = document.getElementById('historyList');
 
 // ---------- Info akun & paket ----------
+let currentLimits = null;
 async function loadMe(){
   try {
     const res = await fetch('/api/me');
@@ -386,6 +387,9 @@ async function loadMe(){
     const me = await res.json();
     document.getElementById('orgLabel').textContent = me.org ? me.org.name : '';
     document.getElementById('planBadge').textContent = me.org && me.org.plan === 'pro' ? 'Pro' : 'Gratis';
+    currentLimits = me.limits || null;
+    // Refresh label workspace (jumlah halaman/batas) sekarang udah tau batas paketnya
+    loadWorkspaces(currentWorkspaceId || undefined);
   } catch (e) { /* biarkan, jangan blok UI */ }
 }
 loadMe();
@@ -437,7 +441,8 @@ async function loadWorkspaces(selectId){
     list.forEach(ws => {
       const opt = document.createElement('option');
       opt.value = ws.id;
-      opt.textContent = ws.name + ' (' + ws.pageCount + '/3 halaman)';
+      const maxPages = currentLimits ? currentLimits.maxPagesPerWorkspace : '?';
+      opt.textContent = ws.name + ' (' + ws.pageCount + '/' + maxPages + ' halaman)';
       workspaceSelect.appendChild(opt);
     });
     currentWorkspaceId = selectId && list.find(w => w.id === selectId) ? selectId : list[0].id;
