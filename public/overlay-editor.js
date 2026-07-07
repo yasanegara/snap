@@ -439,6 +439,138 @@
     return found;
   }
 
+  // ---------- Tombol mengambang "🪄 Edit Seluruh Halaman dengan AI" ----------
+  function injectWholePageEditButton(){
+    if (!window.__aiEditEndpoint || document.getElementById('__whole-page-edit-btn')) return;
+    var btn = document.createElement('button');
+    btn.id = '__whole-page-edit-btn';
+    btn.innerHTML = '🪄 Edit Seluruh Halaman';
+    btn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:999996;background:#7C3AED;color:#fff;border:none;padding:10px 16px;border-radius:24px;font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 3px 14px rgba(124,58,237,.5);font-family:-apple-system,sans-serif;';
+    btn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      openAiWholePagePopover();
+    });
+    document.body.appendChild(btn);
+  }
+
+  // ---------- Popover: edit SELURUH data halaman (semua section) pakai 1 instruksi ----------
+  function openAiWholePagePopover(){
+    closeAllPopovers();
+    var pop = document.createElement('div');
+    pop.id = '__ai-page-popover';
+    pop.style.cssText = 'position:fixed;z-index:1000000;background:#fff;border:1px solid #ddd;border-radius:14px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);font-family:-apple-system,sans-serif;width:320px;bottom:70px;right:16px;';
+
+    var label = document.createElement('div');
+    label.textContent = '🪄 Edit Seluruh Halaman dengan AI';
+    label.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:4px;color:#222;';
+    pop.appendChild(label);
+
+    var hint = document.createElement('div');
+    hint.textContent = 'Buat perubahan yang nyentuh banyak bagian sekaligus, misal: "ganti semua warna aksen jadi biru" atau "buat semua tulisan lebih santai".';
+    hint.style.cssText = 'font-size:11px;color:#888;margin-bottom:10px;line-height:1.4;';
+    pop.appendChild(hint);
+
+    var textarea = document.createElement('textarea');
+    textarea.placeholder = 'Contoh: ganti semua warna aksen jadi hijau, dan buat semua judul section lebih catchy';
+    textarea.style.cssText = 'width:100%;min-height:70px;padding:8px;border:1px solid #ccc;border-radius:7px;font-size:12.5px;margin-bottom:10px;font-family:inherit;box-sizing:border-box;color:#111;background:#fff;';
+    pop.appendChild(textarea);
+
+    var statusDiv = document.createElement('div');
+    statusDiv.style.cssText = 'font-size:11.5px;margin-bottom:8px;display:none;';
+    pop.appendChild(statusDiv);
+
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Batal';
+    cancelBtn.style.cssText = 'padding:7px 12px;border:1px solid #ccc;background:#fff;border-radius:7px;font-size:12px;cursor:pointer;';
+    cancelBtn.onclick = function(){ pop.remove(); };
+
+    var sendBtn = document.createElement('button');
+    sendBtn.textContent = 'Kirim ke AI';
+    sendBtn.style.cssText = 'padding:7px 14px;border:none;background:#7C3AED;color:#fff;border-radius:7px;font-size:12px;cursor:pointer;font-weight:700;';
+    sendBtn.onclick = function(){
+      var instruction = textarea.value.trim();
+      if (!instruction) { alert('Isi dulu instruksinya.'); return; }
+      sendBtn.disabled = true; cancelBtn.disabled = true;
+      sendBtn.textContent = '⏳ AI mikir...';
+      statusDiv.style.display = 'block';
+      statusDiv.style.color = '#666';
+      statusDiv.textContent = 'Menunggu AI...';
+
+      var currentSiteData = window.__getSiteData();
+      var streamEndpoint = window.__aiEditEndpoint.replace('/api/edit-section', '/api/edit-page-stream');
+
+      function finishWithError(msg){
+        statusDiv.style.color = '#c00';
+        statusDiv.textContent = msg;
+        sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
+      }
+
+      fetch(streamEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentData: currentSiteData, instruction: instruction })
+      }).then(function(res){
+        if (res.status === 402) {
+          return res.json().then(function(data){ finishWithError(data.error || 'Token AI habis.'); });
+        }
+        if (!res.ok || !res.body) {
+          return res.text().then(function(rawText){
+            var data; try { data = JSON.parse(rawText); } catch (e) { data = {}; }
+            finishWithError('Gagal: ' + (data.error || 'Server lagi ada gangguan sesaat. Coba lagi.'));
+          });
+        }
+
+        var reader = res.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function readChunk(){
+          reader.read().then(function(result){
+            if (result.done) return;
+            buffer += decoder.decode(result.value, { stream: true });
+            var parts = buffer.split('\n\n');
+            buffer = parts.pop();
+
+            parts.forEach(function(part){
+              var line = part.trim();
+              if (line.indexOf('data:') !== 0) return;
+              var evt;
+              try { evt = JSON.parse(line.slice(5).trim()); } catch (e) { return; }
+
+              if (evt.type === 'progress') {
+                statusDiv.textContent = 'AI lagi nulis... (' + evt.charCount.toLocaleString('id-ID') + ' karakter)';
+              } else if (evt.type === 'done') {
+                window.__setSiteData(function(){ return evt.data; });
+                statusDiv.style.color = '#0a7a4a';
+                statusDiv.textContent = 'Seluruh halaman berhasil diupdate ✓';
+                if (window.parent) window.parent.postMessage({ type: 'ai-page-edited' }, '*');
+                setTimeout(function(){ pop.remove(); }, 1200);
+              } else if (evt.type === 'error') {
+                finishWithError('Gagal: ' + evt.error);
+              }
+            });
+
+            readChunk();
+          }).catch(function(){
+            finishWithError('Gagal: koneksi terputus. Coba lagi.');
+          });
+        }
+        readChunk();
+      }).catch(function(e){
+        finishWithError('Gagal: ' + e.message);
+      });
+    };
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(sendBtn);
+    pop.appendChild(btnRow);
+    document.body.appendChild(pop);
+    textarea.focus();
+  }
+
   function init(){
     var styleTag = document.createElement('style');
     styleTag.textContent = '[data-edit]:hover{ outline:2px dashed #5eead4 !important; outline-offset:2px; cursor:pointer !important; }';
@@ -450,6 +582,8 @@
       e.preventDefault(); e.stopPropagation();
       openChoiceMenu(el);
     }, true);
+
+    injectWholePageEditButton();
 
     (function retrySectionButtons(attempt){
       attempt = attempt || 0;
