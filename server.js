@@ -584,9 +584,11 @@ app.post('/api/public-edit-section/:slug', async (req, res) => {
     return res.status(402).json({ error: 'Token AI buat website ini sudah habis. Hubungi pengelola website.' });
   }
 
+  const { stripped: strippedData, map: imageMap } = stripBase64Images(currentData);
+
   const editPrompt =
     'Ini data JSON sebuah website (struktur siteData React):\n\n' +
-    JSON.stringify(currentData, null, 2) + '\n\n' +
+    JSON.stringify(strippedData, null, 2) + '\n\n' +
     'Tolong ubah data di atas sesuai instruksi berikut: "' + instruction.trim() + '"\n\n' +
     'ATURAN WAJIB (PENTING BANGET):\n' +
     '- Balikin CUMA objek JSON mentah hasil yang sudah diupdate. JANGAN pakai pembungkus ```json atau ``` apa pun. JANGAN kasih kalimat pembuka/penutup/penjelasan sama sekali.\n' +
@@ -597,11 +599,12 @@ app.post('/api/public-edit-section/:slug', async (req, res) => {
 
   try {
     const { text: rawText, usage } = await generateHtmlFromPrompt(editPrompt);
-    const updatedData = extractJSONObject(rawText);
+    let updatedData = extractJSONObject(rawText);
 
     if (updatedData === undefined) {
       return res.status(500).json({ error: 'AI membalas dengan format yang gak valid. Coba instruksi yang lebih spesifik/sederhana, atau coba lagi.' });
     }
+    updatedData = restoreBase64Images(updatedData, imageMap);
 
     const tokensUsed = usage.inputTokens + usage.outputTokens;
     await pool.query(
@@ -748,9 +751,11 @@ app.post('/api/edit-section', requireAuth, async (req, res) => {
     });
   }
 
+  const { stripped: strippedData1, map: imageMap1 } = stripBase64Images(currentData);
+
   const editPrompt =
     'Ini data JSON sebuah website (struktur siteData React):\n\n' +
-    JSON.stringify(currentData, null, 2) + '\n\n' +
+    JSON.stringify(strippedData1, null, 2) + '\n\n' +
     'Tolong ubah data di atas sesuai instruksi berikut: "' + instruction.trim() + '"\n\n' +
     'ATURAN WAJIB (PENTING BANGET):\n' +
     '- Balikin CUMA objek JSON mentah hasil yang sudah diupdate. JANGAN pakai pembungkus ```json atau ``` apa pun. JANGAN kasih kalimat pembuka/penutup/penjelasan sama sekali.\n' +
@@ -761,13 +766,14 @@ app.post('/api/edit-section', requireAuth, async (req, res) => {
 
   try {
     const { text: rawText, usage } = await generateHtmlFromPrompt(editPrompt);
-    const updatedData = extractJSONObject(rawText);
+    let updatedData = extractJSONObject(rawText);
 
     if (updatedData === undefined) {
       return res.status(500).json({
         error: 'AI membalas dengan format yang gak valid. Coba instruksi yang lebih spesifik/sederhana, atau coba lagi. (Token gak kepotong buat percobaan yang gagal ini.)'
       });
     }
+    updatedData = restoreBase64Images(updatedData, imageMap1);
 
     const tokensUsed = usage.inputTokens + usage.outputTokens;
     await pool.query(
@@ -785,6 +791,52 @@ app.post('/api/edit-section', requireAuth, async (req, res) => {
   }
 });
 
+// Foto yang disimpan sebagai base64 itu teksnya BISA SANGAT PANJANG (puluhan ribu karakter).
+// Kalau dikirim apa adanya ke AI, gampang kelewat batas ukuran yang model itu sanggup terima.
+// Solusinya: ganti dulu jadi teks pendek (placeholder) sebelum dikirim, terus balikin lagi
+// abis AI selesai — toh AI emang dilarang ubah foto kecuali diminta jelas.
+function stripBase64Images(data) {
+  const map = {};
+  let counter = 0;
+
+  function walk(obj) {
+    if (typeof obj === 'string') {
+      if (obj.startsWith('data:image')) {
+        const key = '__FOTO_' + (counter++) + '__';
+        map[key] = obj;
+        return key;
+      }
+      return obj;
+    }
+    if (Array.isArray(obj)) return obj.map(walk);
+    if (obj && typeof obj === 'object') {
+      const result = {};
+      for (const k in obj) result[k] = walk(obj[k]);
+      return result;
+    }
+    return obj;
+  }
+
+  const stripped = walk(data);
+  return { stripped, map };
+}
+
+function restoreBase64Images(data, map) {
+  function walk(obj) {
+    if (typeof obj === 'string') {
+      return Object.prototype.hasOwnProperty.call(map, obj) ? map[obj] : obj;
+    }
+    if (Array.isArray(obj)) return obj.map(walk);
+    if (obj && typeof obj === 'object') {
+      const result = {};
+      for (const k in obj) result[k] = walk(obj[k]);
+      return result;
+    }
+    return obj;
+  }
+  return walk(data);
+}
+
 // Versi streaming dari /api/edit-section — sama kayak /api/generate-stream, biar progress
 // yang ditampilkan di popover "Edit Section" itu beneran (bukan cuma pesan muter-muter doang).
 app.post('/api/edit-section-stream', requireAuth, async (req, res) => {
@@ -800,9 +852,11 @@ app.post('/api/edit-section-stream', requireAuth, async (req, res) => {
     });
   }
 
+  const { stripped: strippedData2, map: imageMap2 } = stripBase64Images(currentData);
+
   const editPrompt =
     'Ini data JSON sebuah website (struktur siteData React):\n\n' +
-    JSON.stringify(currentData, null, 2) + '\n\n' +
+    JSON.stringify(strippedData2, null, 2) + '\n\n' +
     'Tolong ubah data di atas sesuai instruksi berikut: "' + instruction.trim() + '"\n\n' +
     'ATURAN WAJIB (PENTING BANGET):\n' +
     '- Balikin CUMA objek JSON mentah hasil yang sudah diupdate. JANGAN pakai pembungkus ```json atau ``` apa pun. JANGAN kasih kalimat pembuka/penutup/penjelasan sama sekali.\n' +
@@ -823,12 +877,13 @@ app.post('/api/edit-section-stream', requireAuth, async (req, res) => {
     const { text: rawText, usage } = await generateHtmlFromPromptStream(editPrompt, (charCount) => {
       send({ type: 'progress', charCount });
     });
-    const updatedData = extractJSONObject(rawText);
+    let updatedData = extractJSONObject(rawText);
 
     if (updatedData === undefined) {
       send({ type: 'error', error: 'AI membalas dengan format yang gak valid. Coba instruksi yang lebih spesifik/sederhana, atau coba lagi. (Token gak kepotong buat percobaan yang gagal ini.)' });
       return res.end();
     }
+    updatedData = restoreBase64Images(updatedData, imageMap2);
 
     const tokensUsed2 = usage.inputTokens + usage.outputTokens;
     await pool.query(
@@ -864,9 +919,11 @@ app.post('/api/edit-page-stream', requireAuth, async (req, res) => {
     });
   }
 
+  const { stripped: strippedData3, map: imageMap3 } = stripBase64Images(currentData);
+
   const editPrompt =
     'Ini data JSON SELURUH HALAMAN website (struktur siteData React, semua section ada di sini):\n\n' +
-    JSON.stringify(currentData, null, 2) + '\n\n' +
+    JSON.stringify(strippedData3, null, 2) + '\n\n' +
     'Tolong ubah data di atas sesuai instruksi berikut (instruksi ini bisa nyentuh SATU section atau BANYAK section sekaligus): "' + instruction.trim() + '"\n\n' +
     'ATURAN WAJIB (PENTING BANGET):\n' +
     '- Balikin SELURUH object JSON (semua section, semua field), bukan cuma bagian yang berubah — soalnya hasilnya bakal langsung GANTI TOTAL data yang lama.\n' +
@@ -888,12 +945,13 @@ app.post('/api/edit-page-stream', requireAuth, async (req, res) => {
     const { text: rawText, usage } = await generateHtmlFromPromptStream(editPrompt, (charCount) => {
       send({ type: 'progress', charCount });
     });
-    const updatedData = extractJSONObject(rawText);
+    let updatedData = extractJSONObject(rawText);
 
     if (updatedData === undefined) {
       send({ type: 'error', error: 'AI membalas dengan format yang gak valid. Coba instruksi yang lebih spesifik/sederhana, atau coba lagi. (Token gak kepotong buat percobaan yang gagal ini.)' });
       return res.end();
     }
+    updatedData = restoreBase64Images(updatedData, imageMap3);
 
     const tokensUsed = usage.inputTokens + usage.outputTokens;
     await pool.query(
