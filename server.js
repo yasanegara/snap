@@ -754,11 +754,13 @@ app.post('/api/edit-section', requireAuth, async (req, res) => {
   const { stripped: strippedData1, map: imageMap1 } = stripBase64Images(currentData);
 
   const editPrompt =
-    'Ini data JSON sebuah website (struktur siteData React):\n\n' +
+    'Ini data JSON sebuah section website, DIBUNGKUS bareng data "design" (warna, dll) yang berlaku GLOBAL buat seluruh halaman:\n\n' +
     JSON.stringify(strippedData1, null, 2) + '\n\n' +
     'Tolong ubah data di atas sesuai instruksi berikut: "' + instruction.trim() + '"\n\n' +
     'ATURAN WAJIB (PENTING BANGET):\n' +
-    '- Balikin CUMA objek JSON mentah hasil yang sudah diupdate. JANGAN pakai pembungkus ```json atau ``` apa pun. JANGAN kasih kalimat pembuka/penutup/penjelasan sama sekali.\n' +
+    '- Struktur objeknya ada 2 bagian: "section" (data section ini doang) dan "design" (warna/style global, dipakai SEMUA section, hati-hati kalau ubah ini soalnya efeknya ke seluruh halaman).\n' +
+    '- Biasanya kamu cuma perlu ubah bagian "section". Ubah bagian "design" HANYA kalau instruksinya jelas-jelas soal warna/style GLOBAL (misal "ganti warna tombol semua jadi merah").\n' +
+    '- Balikin CUMA objek JSON mentah hasil yang sudah diupdate, dengan struktur { "section": {...}, "design": {...} } PERSIS SAMA kayak yang dikasih. JANGAN pakai pembungkus ```json atau ``` apa pun. JANGAN kasih kalimat pembuka/penutup/penjelasan sama sekali.\n' +
     '- Jawaban kamu HARUS langsung dimulai dengan tanda { dan langsung diakhiri dengan tanda }.\n' +
     '- JANGAN mengubah struktur/nama field yang sudah ada (jangan tambah/hapus field).\n' +
     '- Field yang gak disebut di instruksi, biarkan nilainya sama persis seperti semula.\n' +
@@ -855,11 +857,13 @@ app.post('/api/edit-section-stream', requireAuth, async (req, res) => {
   const { stripped: strippedData2, map: imageMap2 } = stripBase64Images(currentData);
 
   const editPrompt =
-    'Ini data JSON sebuah website (struktur siteData React):\n\n' +
+    'Ini data JSON sebuah section website, DIBUNGKUS bareng data "design" (warna, dll) yang berlaku GLOBAL buat seluruh halaman:\n\n' +
     JSON.stringify(strippedData2, null, 2) + '\n\n' +
     'Tolong ubah data di atas sesuai instruksi berikut: "' + instruction.trim() + '"\n\n' +
     'ATURAN WAJIB (PENTING BANGET):\n' +
-    '- Balikin CUMA objek JSON mentah hasil yang sudah diupdate. JANGAN pakai pembungkus ```json atau ``` apa pun. JANGAN kasih kalimat pembuka/penutup/penjelasan sama sekali.\n' +
+    '- Struktur objeknya ada 2 bagian: "section" (data section ini doang) dan "design" (warna/style global, dipakai SEMUA section, hati-hati kalau ubah ini soalnya efeknya ke seluruh halaman).\n' +
+    '- Biasanya kamu cuma perlu ubah bagian "section". Ubah bagian "design" HANYA kalau instruksinya jelas-jelas soal warna/style GLOBAL (misal "ganti warna tombol semua jadi merah").\n' +
+    '- Balikin CUMA objek JSON mentah hasil yang sudah diupdate, dengan struktur { "section": {...}, "design": {...} } PERSIS SAMA kayak yang dikasih. JANGAN pakai pembungkus ```json atau ``` apa pun. JANGAN kasih kalimat pembuka/penutup/penjelasan sama sekali.\n' +
     '- Jawaban kamu HARUS langsung dimulai dengan tanda { dan langsung diakhiri dengan tanda }.\n' +
     '- JANGAN mengubah struktur/nama field yang sudah ada (jangan tambah/hapus field).\n' +
     '- Field yang gak disebut di instruksi, biarkan nilainya sama persis seperti semula.\n' +

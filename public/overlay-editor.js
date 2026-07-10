@@ -302,7 +302,7 @@
     pop.appendChild(label);
 
     var textarea = document.createElement('textarea');
-    textarea.placeholder = 'Contoh: buat judulnya lebih menarik buat anak muda';
+    textarea.placeholder = 'Contoh: buat judulnya lebih menarik, ganti harganya jadi 99rb, atau ganti warna tombol di section ini jadi merah';
     textarea.style.cssText = 'width:100%;min-height:64px;padding:8px;border:1px solid #ccc;border-radius:7px;font-size:12.5px;margin-bottom:10px;font-family:inherit;box-sizing:border-box;color:#111;background:#fff;';
     pop.appendChild(textarea);
 
@@ -343,7 +343,10 @@
       fetch(streamEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentData: currentSectionData, instruction: instruction })
+        body: JSON.stringify({
+          currentData: { section: currentSectionData, design: currentSiteData.design || {} },
+          instruction: instruction
+        })
       }).then(function(res){
         if (res.status === 402) {
           return res.json().then(function(data){ finishWithError(data.error || 'Token AI habis.'); });
@@ -377,7 +380,13 @@
               } else if (evt.type === 'done') {
                 window.__setSiteData(function(prev){
                   var next = JSON.parse(JSON.stringify(prev));
-                  next.sections[sectionName] = evt.data;
+                  if (evt.data && evt.data.section !== undefined) {
+                    next.sections[sectionName] = evt.data.section;
+                    if (evt.data.design !== undefined) next.design = evt.data.design;
+                  } else {
+                    // Jaga-jaga kalau AI balikin format lama (langsung objek section doang)
+                    next.sections[sectionName] = evt.data;
+                  }
                   return next;
                 });
                 statusDiv.style.color = '#0a7a4a';
