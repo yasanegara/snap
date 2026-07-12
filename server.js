@@ -75,7 +75,8 @@ app.get('/api/health-check', async (req, res) => {
 });
 
 app.get('/', attachUserIfAny, (req, res) => {
-  res.redirect(req.user ? '/app' : '/login.html');
+  if (req.user) return res.redirect('/dashboard.html');
+  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
 });
 
 app.get('/app', requireAuthPage, (req, res) => {
@@ -1118,6 +1119,96 @@ app.post('/api/superadmin/orgs/:id/topup', requireAuth, requireSuperAdmin, async
   );
   if (r.rowCount === 0) return res.status(404).json({ error: 'Tim tidak ditemukan' });
   res.json({ ok: true, newBalance: Number(r.rows[0].token_balance) });
+});
+
+// ---------------------------------------------------------------------------
+// Landing Page (halaman depan klikweb.id) — kontennya bisa diatur dari Panel Superadmin
+// ---------------------------------------------------------------------------
+const DEFAULT_LANDING_CONTENT = {
+  brandName: 'klikweb.id',
+  hero: {
+    badge: '🚀 Khusus Buat UMKM Indonesia',
+    headline: 'Website UMKM Kamu Bisa ONLINE Hari Ini Juga',
+    subheadline: 'Gak perlu ngoding, gak perlu nunggu berminggu-minggu, gak perlu keluar duit buat hosting & domain. Tinggal pilih desain, isi info bisnis kamu, langsung jadi website profesional yang siap dipakai jualan.',
+    ctaText: 'Mulai Gratis Sekarang',
+    ctaLink: '/register.html',
+    ctaNote: 'Gratis coba, gak perlu kartu kredit'
+  },
+  painPoints: {
+    title: 'Kenal Gak Masalah Kayak Gini?',
+    items: [
+      'Udah coba bikin website sendiri, eh malah ribet dan berakhir gak jadi-jadi',
+      'Disuruh bayar hosting & domain tiap tahun yang bikin modal usaha bengkak',
+      'Pesan ke jasa bikin website, nunggunya berminggu-minggu padahal pengen jualan SEKARANG',
+      'Udah punya website, tapi mau ganti teks/foto dikit aja harus nunggu developer'
+    ]
+  },
+  features: {
+    title: 'Semua Beres Dalam 1 Platform',
+    items: [
+      { icon: '🌐', title: 'Hosting Gratis Selamanya', desc: 'Gak ada lagi tagihan bulanan buat server. Website kamu tetap online tanpa biaya tambahan.' },
+      { icon: '🎁', title: 'Domain .com Gratis', desc: 'Buat member paket tertentu, dapet domain .com sendiri (bukan subdomain), gratis di tahun pertama.' },
+      { icon: '⚡', title: 'Ringan & Cepat Loading', desc: 'Website landing page yang ringan, jadi pengunjung gak kabur nunggu loading lama.' },
+      { icon: '✏️', title: 'Edit Sendiri Kapan Aja', desc: 'Mau ganti teks, harga, atau foto? Tinggal klik dan edit sendiri, gak perlu nunggu developer.' },
+      { icon: '📱', title: 'Otomatis Rapi di HP', desc: 'Kebanyakan pengunjung buka dari HP — website kamu otomatis nyesuain, gak perlu setting apa-apa.' },
+      { icon: '💬', title: 'Terintegrasi WhatsApp', desc: 'Pengunjung bisa langsung chat WhatsApp buat nanya atau order, gak perlu ribet cari kontak.' }
+    ]
+  },
+  pricing: {
+    title: 'Mulai Gratis, Upgrade Kalau Udah Yakin',
+    subtitle: 'Gak ada biaya tersembunyi. Gak ada kontrak. Berhenti kapan aja.',
+    plans: [
+      {
+        name: 'Gratis',
+        price: 'Rp 0',
+        period: 'selamanya',
+        highlight: false,
+        features: ['1 Website', 'Hosting gratis', 'Subdomain klikweb.id', 'Edit sendiri kapan aja'],
+        ctaText: 'Mulai Gratis'
+      },
+      {
+        name: 'Pro',
+        price: 'Hubungi Kami',
+        period: '',
+        highlight: true,
+        features: ['Website tanpa batas', 'Hosting gratis', 'Domain .com GRATIS', 'AI generate otomatis', 'Support prioritas'],
+        ctaText: 'Upgrade ke Pro'
+      }
+    ]
+  },
+  faq: {
+    title: 'Pertanyaan yang Sering Ditanya',
+    items: [
+      { q: 'Beneran gratis, gak ada biaya tersembunyi?', a: 'Iya, paket Gratis beneran gratis selamanya. Kalau butuh lebih (misal domain .com sendiri), baru upgrade ke Pro.' },
+      { q: 'Perlu bisa ngoding gak?', a: 'Gak sama sekali. Tinggal isi form info bisnis kamu, AI yang bikinin websitenya. Tinggal edit dikit kalau perlu.' },
+      { q: 'Berapa lama website-nya jadi?', a: 'Hitungan menit, bukan minggu. Isi form, generate, langsung bisa di-publish.' },
+      { q: 'Domain gratisnya beneran punya sendiri?', a: 'Iya, bukan subdomain. Kamu bisa pasang domain .com sendiri (misal namabisnismu.com) buat paket Pro.' }
+    ]
+  },
+  finalCta: {
+    headline: 'Tunggu Apa Lagi? Bisnismu Layak Online Hari Ini',
+    subheadline: 'Ribuan UMKM udah mulai duluan. Giliran kamu sekarang.',
+    ctaText: 'Mulai Gratis Sekarang',
+    ctaLink: '/register.html'
+  },
+  footerText: '© klikweb.id — Website UMKM Gampang, Cepat, Gratis.'
+};
+
+app.get('/api/landing-content', async (req, res) => {
+  const saved = await getSetting('landing_content', null);
+  res.json(saved ? JSON.parse(saved) : DEFAULT_LANDING_CONTENT);
+});
+
+app.post('/api/superadmin/landing-content', requireAuth, requireSuperAdmin, async (req, res) => {
+  const content = req.body;
+  if (!content || typeof content !== 'object') return res.status(400).json({ error: 'Data gak valid' });
+  await setSetting('landing_content', JSON.stringify(content));
+  res.json({ ok: true });
+});
+
+app.get('/api/superadmin/landing-content/reset', requireAuth, requireSuperAdmin, async (req, res) => {
+  await setSetting('landing_content', JSON.stringify(DEFAULT_LANDING_CONTENT));
+  res.json({ ok: true, content: DEFAULT_LANDING_CONTENT });
 });
 
 app.get('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {

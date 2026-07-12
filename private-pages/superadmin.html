@@ -128,6 +128,56 @@
     <span id="saveSettingsStatus" style="margin-left:10px;font-size:12.5px;color:var(--muted);"></span>
   </div>
 
+  <h2>🏠 Landing Page (Halaman Depan klikweb.id)</h2>
+  <div class="settings-box" style="margin-bottom:30px;">
+    <p class="hint" style="margin-bottom:16px;">Atur isi halaman depan yang dilihat pengunjung sebelum daftar. Perubahan langsung tayang begitu disimpan.</p>
+
+    <div class="field">
+      <label>Nama Brand</label>
+      <input type="text" id="lp_brandName" placeholder="klikweb.id" />
+    </div>
+
+    <h3 style="font-size:13.5px;margin:20px 0 10px;color:var(--muted);">HERO (Bagian Paling Atas)</h3>
+    <div class="field"><label>Badge Kecil</label><input type="text" id="lp_hero_badge" /></div>
+    <div class="field"><label>Judul Utama</label><input type="text" id="lp_hero_headline" /></div>
+    <div class="field"><label>Sub Judul</label><textarea id="lp_hero_subheadline" style="width:100%;min-height:60px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:8px;border-radius:7px;font-size:13px;box-sizing:border-box;"></textarea></div>
+    <div class="field"><label>Teks Tombol CTA</label><input type="text" id="lp_hero_ctaText" /></div>
+    <div class="field"><label>Link Tombol CTA</label><input type="text" id="lp_hero_ctaLink" /></div>
+    <div class="field"><label>Catatan Kecil Bawah Tombol</label><input type="text" id="lp_hero_ctaNote" /></div>
+
+    <h3 style="font-size:13.5px;margin:20px 0 10px;color:var(--muted);">MASALAH YANG DIANGKAT (Judul + daftar, 1 baris 1 poin)</h3>
+    <div class="field"><label>Judul Section</label><input type="text" id="lp_pain_title" /></div>
+    <div class="field"><label>Daftar Masalah</label><textarea id="lp_pain_items" style="width:100%;min-height:90px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:8px;border-radius:7px;font-size:13px;box-sizing:border-box;"></textarea></div>
+
+    <h3 style="font-size:13.5px;margin:20px 0 10px;color:var(--muted);">FITUR (Format JSON: emoji | judul | deskripsi, 1 baris 1 fitur)</h3>
+    <div class="field"><label>Judul Section</label><input type="text" id="lp_features_title" /></div>
+    <div class="field"><label>Daftar Fitur</label><textarea id="lp_features_items" style="width:100%;min-height:130px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:8px;border-radius:7px;font-size:12.5px;box-sizing:border-box;font-family:ui-monospace,monospace;"></textarea></div>
+
+    <h3 style="font-size:13.5px;margin:20px 0 10px;color:var(--muted);">HARGA (Edit langsung dalam bentuk JSON, hati-hati formatnya)</h3>
+    <div class="field"><label>Judul Section</label><input type="text" id="lp_pricing_title" /></div>
+    <div class="field"><label>Sub Judul</label><input type="text" id="lp_pricing_subtitle" /></div>
+    <div class="field"><label>Paket-Paket (JSON)</label><textarea id="lp_pricing_plans" style="width:100%;min-height:160px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:8px;border-radius:7px;font-size:12px;box-sizing:border-box;font-family:ui-monospace,monospace;"></textarea></div>
+
+    <h3 style="font-size:13.5px;margin:20px 0 10px;color:var(--muted);">FAQ (Format: pertanyaan | jawaban, 1 baris 1 FAQ)</h3>
+    <div class="field"><label>Judul Section</label><input type="text" id="lp_faq_title" /></div>
+    <div class="field"><label>Daftar FAQ</label><textarea id="lp_faq_items" style="width:100%;min-height:110px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:8px;border-radius:7px;font-size:12.5px;box-sizing:border-box;font-family:ui-monospace,monospace;"></textarea></div>
+
+    <h3 style="font-size:13.5px;margin:20px 0 10px;color:var(--muted);">CTA PENUTUP (Paling Bawah)</h3>
+    <div class="field"><label>Judul</label><input type="text" id="lp_finalcta_headline" /></div>
+    <div class="field"><label>Sub Judul</label><input type="text" id="lp_finalcta_subheadline" /></div>
+    <div class="field"><label>Teks Tombol</label><input type="text" id="lp_finalcta_ctaText" /></div>
+
+    <h3 style="font-size:13.5px;margin:20px 0 10px;color:var(--muted);">FOOTER</h3>
+    <div class="field"><label>Teks Footer</label><input type="text" id="lp_footerText" /></div>
+
+    <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
+      <button class="btn-save" id="saveLandingBtn">Simpan Landing Page</button>
+      <button class="btn" id="resetLandingBtn" style="padding:9px 16px;font-size:13px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);cursor:pointer;">Reset ke Default</button>
+      <a href="/" target="_blank" style="font-size:12.5px;color:var(--accent);">👁️ Lihat Halaman Live</a>
+      <span id="saveLandingStatus" style="font-size:12.5px;color:var(--muted);"></span>
+    </div>
+  </div>
+
   <h2>Daftar Semua Tim</h2>
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="Cari nama tim..." />
@@ -369,6 +419,141 @@ document.getElementById('saveSettingsBtn').addEventListener('click', async () =>
     document.getElementById('anthropicApiKeyInput').value = '';
     document.getElementById('sumopodApiKeyInput').value = '';
     loadAiSettings();
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+  } catch (e) {
+    statusEl.textContent = 'Gagal: ' + e.message;
+  }
+});
+
+// ---------- Landing Page ----------
+function featuresToText(items){
+  return (items || []).map(f => f.icon + ' | ' + f.title + ' | ' + f.desc).join('\n');
+}
+function textToFeatures(text){
+  return text.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+    const parts = line.split('|').map(p => p.trim());
+    return { icon: parts[0] || '✨', title: parts[1] || '', desc: parts[2] || '' };
+  });
+}
+function faqToText(items){
+  return (items || []).map(f => f.q + ' | ' + f.a).join('\n');
+}
+function textToFaq(text){
+  return text.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+    const idx = line.indexOf('|');
+    return { q: (idx > -1 ? line.slice(0, idx) : line).trim(), a: (idx > -1 ? line.slice(idx + 1) : '').trim() };
+  });
+}
+
+function fillLandingForm(c){
+  document.getElementById('lp_brandName').value = c.brandName || '';
+  document.getElementById('lp_hero_badge').value = c.hero.badge || '';
+  document.getElementById('lp_hero_headline').value = c.hero.headline || '';
+  document.getElementById('lp_hero_subheadline').value = c.hero.subheadline || '';
+  document.getElementById('lp_hero_ctaText').value = c.hero.ctaText || '';
+  document.getElementById('lp_hero_ctaLink').value = c.hero.ctaLink || '';
+  document.getElementById('lp_hero_ctaNote').value = c.hero.ctaNote || '';
+
+  document.getElementById('lp_pain_title').value = c.painPoints.title || '';
+  document.getElementById('lp_pain_items').value = (c.painPoints.items || []).join('\n');
+
+  document.getElementById('lp_features_title').value = c.features.title || '';
+  document.getElementById('lp_features_items').value = featuresToText(c.features.items);
+
+  document.getElementById('lp_pricing_title').value = c.pricing.title || '';
+  document.getElementById('lp_pricing_subtitle').value = c.pricing.subtitle || '';
+  document.getElementById('lp_pricing_plans').value = JSON.stringify(c.pricing.plans || [], null, 2);
+
+  document.getElementById('lp_faq_title').value = c.faq.title || '';
+  document.getElementById('lp_faq_items').value = faqToText(c.faq.items);
+
+  document.getElementById('lp_finalcta_headline').value = c.finalCta.headline || '';
+  document.getElementById('lp_finalcta_subheadline').value = c.finalCta.subheadline || '';
+  document.getElementById('lp_finalcta_ctaText').value = c.finalCta.ctaText || '';
+
+  document.getElementById('lp_footerText').value = c.footerText || '';
+}
+
+async function loadLandingSettings(){
+  try {
+    const res = await fetch('/api/landing-content');
+    if (!res.ok) return;
+    const c = await res.json();
+    fillLandingForm(c);
+  } catch (e) { /* biarin */ }
+}
+loadLandingSettings();
+
+document.getElementById('saveLandingBtn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('saveLandingStatus');
+  statusEl.textContent = 'Menyimpan...';
+  try {
+    let pricingPlans;
+    try {
+      pricingPlans = JSON.parse(document.getElementById('lp_pricing_plans').value);
+    } catch (e) {
+      statusEl.textContent = 'Format JSON di bagian Harga gak valid: ' + e.message;
+      return;
+    }
+
+    const content = {
+      brandName: document.getElementById('lp_brandName').value.trim(),
+      hero: {
+        badge: document.getElementById('lp_hero_badge').value,
+        headline: document.getElementById('lp_hero_headline').value,
+        subheadline: document.getElementById('lp_hero_subheadline').value,
+        ctaText: document.getElementById('lp_hero_ctaText').value,
+        ctaLink: document.getElementById('lp_hero_ctaLink').value,
+        ctaNote: document.getElementById('lp_hero_ctaNote').value
+      },
+      painPoints: {
+        title: document.getElementById('lp_pain_title').value,
+        items: document.getElementById('lp_pain_items').value.split('\n').map(s => s.trim()).filter(Boolean)
+      },
+      features: {
+        title: document.getElementById('lp_features_title').value,
+        items: textToFeatures(document.getElementById('lp_features_items').value)
+      },
+      pricing: {
+        title: document.getElementById('lp_pricing_title').value,
+        subtitle: document.getElementById('lp_pricing_subtitle').value,
+        plans: pricingPlans
+      },
+      faq: {
+        title: document.getElementById('lp_faq_title').value,
+        items: textToFaq(document.getElementById('lp_faq_items').value)
+      },
+      finalCta: {
+        headline: document.getElementById('lp_finalcta_headline').value,
+        subheadline: document.getElementById('lp_finalcta_subheadline').value,
+        ctaText: document.getElementById('lp_finalcta_ctaText').value,
+        ctaLink: '/register.html'
+      },
+      footerText: document.getElementById('lp_footerText').value
+    };
+
+    const res = await fetch('/api/superadmin/landing-content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(content)
+    });
+    if (!res.ok) throw new Error('Gagal menyimpan');
+    statusEl.textContent = 'Tersimpan ✓ Langsung tayang di halaman depan.';
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  } catch (e) {
+    statusEl.textContent = 'Gagal: ' + e.message;
+  }
+});
+
+document.getElementById('resetLandingBtn').addEventListener('click', async () => {
+  if (!confirm('Yakin reset ke isi default? Perubahan yang udah kamu buat bakal ilang.')) return;
+  const statusEl = document.getElementById('saveLandingStatus');
+  statusEl.textContent = 'Mereset...';
+  try {
+    const res = await fetch('/api/superadmin/landing-content/reset');
+    const data = await res.json();
+    fillLandingForm(data.content);
+    statusEl.textContent = 'Berhasil direset ✓';
     setTimeout(() => { statusEl.textContent = ''; }, 2000);
   } catch (e) {
     statusEl.textContent = 'Gagal: ' + e.message;
