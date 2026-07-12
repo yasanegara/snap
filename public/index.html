@@ -701,13 +701,13 @@ function updatePublishButtonState(){
   const viewLiveLink = document.getElementById('viewLiveLink');
   if (currentSnippetPublish && currentSnippetPublish.slug) {
     btn.textContent = '🔄 Update Publikasi';
-    btn.title = 'Update halaman live yang sudah ada (/p/' + currentSnippetPublish.slug + ') pakai kode terbaru, tanpa isi ulang slug';
+    btn.title = 'Update halaman live yang sudah ada (/' + currentSnippetPublish.slug + ') pakai kode terbaru, tanpa isi ulang slug';
     asNewBtn.style.display = 'inline-block';
-    // Kalau workspace-nya punya domain kustom, pakai itu; kalau enggak, pakai link /p/slug bawaan
+    // Kalau workspace-nya punya domain kustom, pakai itu; kalau enggak, pakai link /slug bawaan
     const ws = currentWorkspacesList.find(w => w.id === currentWorkspaceId);
     const liveUrl = (ws && ws.customDomain)
       ? ('https://' + ws.customDomain)
-      : (window.location.origin + '/p/' + currentSnippetPublish.slug);
+      : (window.location.origin + '/' + currentSnippetPublish.slug);
     viewLiveLink.href = liveUrl;
     viewLiveLink.style.display = 'inline-block';
   } else {
@@ -950,7 +950,7 @@ async function loadHistory(){
       el.className = 'history-item';
       const date = item.savedAt ? new Date(Number(item.savedAt)).toLocaleDateString('id-ID') : '';
       const publishBadge = item.lastPublishedSlug
-        ? '<span title="Sudah dipublish: /p/' + escapeHtml(item.lastPublishedSlug) + '" style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;background:var(--accent-dim);color:var(--accent);font-size:9.5px;font-weight:600;vertical-align:middle;">🌐 Published</span>'
+        ? '<span title="Sudah dipublish: /' + escapeHtml(item.lastPublishedSlug) + '" style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;background:var(--accent-dim);color:var(--accent);font-size:9.5px;font-weight:600;vertical-align:middle;">🌐 Published</span>'
         : '';
       el.innerHTML = `
         <div class="meta">

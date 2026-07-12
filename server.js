@@ -91,12 +91,9 @@ app.get('/superadmin.html', requireAuthPage, requireSuperAdminPage, (req, res) =
   res.sendFile(path.join(__dirname, 'private-pages', 'superadmin.html'));
 });
 
-// Halaman publik hasil publish
-app.get('/p/:slug', async (req, res) => {
-  const r = await pool.query('SELECT html FROM publishes WHERE slug = $1', [req.params.slug]);
-  if (!r.rows[0]) return res.status(404).send('<h1 style="font-family:sans-serif">404 - Halaman tidak ditemukan</h1>');
-  res.set('Content-Type', 'text/html; charset=utf-8');
-  res.send(r.rows[0].html);
+// Halaman daftar khusus (bebas daftar sendiri, gak lewat WhatsApp) — link ini gak dipromosikan publik
+app.get('/amelt', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'register-internal.html'));
 });
 
 // ---------------------------------------------------------------------------
@@ -531,7 +528,7 @@ app.post('/api/publish', requireAuth, async (req, res) => {
     );
   }
 
-  res.json({ ok: true, slug, url: '/p/' + slug });
+  res.json({ ok: true, slug, url: '/' + slug });
 });
 
 app.delete('/api/publish/:slug', requireAuth, async (req, res) => {
@@ -1237,6 +1234,17 @@ app.post('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req,
   if (sumopodApiKey) await setSetting('ai_api_key_sumopod', sumopodApiKey);
   if (sumopodMaxTokens) await setSetting('ai_max_tokens_sumopod', String(parseInt(sumopodMaxTokens, 10)));
   res.json({ ok: true });
+});
+
+// Halaman publik hasil publish — DIPASANG PALING TERAKHIR dengan sengaja.
+// Formatnya klikweb.id/nama-slug (bukan /p/nama-slug lagi). Karena ini "menangkap"
+// SATU kata di path mana pun, dia WAJIB jadi route paling akhir, biar semua
+// halaman/route lain (yang lebih spesifik) sempat dicek duluan.
+app.get('/:slug', async (req, res) => {
+  const r = await pool.query('SELECT html FROM publishes WHERE slug = $1', [req.params.slug]);
+  if (!r.rows[0]) return res.status(404).send('<h1 style="font-family:sans-serif">404 - Halaman tidak ditemukan</h1>');
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.send(r.rows[0].html);
 });
 
 console.log('Cek DATABASE_URL:', process.env.DATABASE_URL ? 'ADA (' + process.env.DATABASE_URL.replace(/:[^:@]+@/, ':****@') + ')' : 'KOSONG / TIDAK ADA');

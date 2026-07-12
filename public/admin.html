@@ -251,7 +251,7 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   // (bukan ke layar login admin lagi)
   const publicDataMatch = endpoint && endpoint.match(/\/api\/public-data\/([^/?]+)/);
   if (publicDataMatch) {
-    window.location.href = '/p/' + publicDataMatch[1];
+    window.location.href = '/' + publicDataMatch[1];
   } else {
     window.location.href = '/';
   }
