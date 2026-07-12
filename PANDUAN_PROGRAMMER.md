@@ -14,8 +14,7 @@
 6. [Format Link Website & Panel Admin](#6-format-link-website--panel-admin)
 7. [Cara Serah Terima ke Klien](#7-cara-serah-terima-ke-klien)
 8. [Domain Kustom Buat Klien](#8-domain-kustom-buat-klien)
-9. [Panel Superadmin](#9-panel-superadmin)
-10. [Troubleshooting Umum](#10-troubleshooting-umum)
+9. [Troubleshooting Umum](#9-troubleshooting-umum)
 
 ---
 
@@ -76,7 +75,7 @@ Kalau mau atur lebih presisi, kosongin kotak "Ketik Bebas" dan isi:
 - Isi nama project + pilih Workspace, klik **"💾 Simpan ke Workspace"**
 
 ### Kalau Hasil Kepotong
-Biasanya soal model AI "reasoning" yang boros token buat mikir dulu. Coba: kurangi section, generate ulang, atau ganti model di Panel Superadmin.
+Biasanya soal model AI "reasoning" yang boros token buat mikir dulu. Coba: kurangi section, generate ulang, atau hubungi admin platform buat ganti model AI-nya.
 
 ---
 
@@ -129,20 +128,9 @@ Kasih tau klien: mereka bisa toggle section, edit teks/angka/gambar, dan ganti u
 
 ---
 
-## 9. Panel Superadmin
+## 9. Troubleshooting Umum
 
-`/superadmin.html` — cuma buat email yang terdaftar di `SUPERADMIN_EMAILS`.
-
-- **📦 Pengaturan Paket**: batas workspace/halaman/member/token
-- **⚙️ Pengaturan AI**: provider, model, API key, **batas maksimal token output** (penting buat model reasoning kayak DeepSeek/MiniMax yang butuh token lebih besar)
-- **🏠 Landing Page**: atur isi halaman depan klikweb.id (headline, fitur, harga, FAQ)
-- **Daftar Semua Tim**: lihat & top up token tiap tim
-
----
-
-## 10. Troubleshooting Umum
-
-**Hasil generate kepotong** → kurangi section, generate ulang, atau naikin "Batas Maksimal Token Output" di Superadmin (apalagi buat model reasoning)
+**Hasil generate kepotong** → kurangi section, generate ulang, atau hubungi admin platform buat naikin batas token AI-nya (apalagi buat model reasoning)
 
 **"Unexpected token" error** → biasanya gangguan sesaat di infrastruktur, coba lagi beberapa saat
 
