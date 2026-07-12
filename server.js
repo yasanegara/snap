@@ -1130,9 +1130,9 @@ const DEFAULT_LANDING_CONTENT = {
     badge: '🚀 Khusus Buat UMKM Indonesia',
     headline: 'Website UMKM Kamu Bisa ONLINE Hari Ini Juga',
     subheadline: 'Gak perlu ngoding, gak perlu nunggu berminggu-minggu, gak perlu keluar duit buat hosting & domain. Tinggal pilih desain, isi info bisnis kamu, langsung jadi website profesional yang siap dipakai jualan.',
-    ctaText: 'Mulai Gratis Sekarang',
+    ctaText: 'Mulai Sekarang',
     ctaLink: 'https://wa.me/6285641806684?text=Halo%2C%20saya%20mau%20daftar%20bikin%20website%20di%20klikweb.id',
-    ctaNote: 'Gratis coba, gak perlu kartu kredit'
+    ctaNote: 'Chat langsung, dibantu tim kami dari awal sampai online'
   },
   painPoints: {
     title: 'Kenal Gak Masalah Kayak Gini?',
@@ -1155,31 +1155,23 @@ const DEFAULT_LANDING_CONTENT = {
     ]
   },
   pricing: {
-    title: 'Mulai Gratis, Upgrade Kalau Udah Yakin',
-    subtitle: 'Gak ada biaya tersembunyi. Gak ada kontrak. Berhenti kapan aja.',
+    title: 'Investasi Kecil, Bisnismu Online Selamanya',
+    subtitle: 'Gak ada biaya tersembunyi. Gak ada kontrak ribet. Berhenti kapan aja.',
     plans: [
-      {
-        name: 'Gratis',
-        price: 'Rp 0',
-        period: 'selamanya',
-        highlight: false,
-        features: ['1 Website', 'Hosting gratis', 'Subdomain klikweb.id', 'Edit sendiri kapan aja'],
-        ctaText: 'Mulai Gratis'
-      },
       {
         name: 'Pro',
         price: 'Rp 16.700',
         period: '/hari (setara Rp 500rb/bulan)',
         highlight: true,
         features: ['Website tanpa batas', 'Hosting gratis', 'Domain .com GRATIS', 'AI generate otomatis', 'Support prioritas'],
-        ctaText: 'Upgrade ke Pro'
+        ctaText: 'Mulai Sekarang'
       }
     ]
   },
   faq: {
     title: 'Pertanyaan yang Sering Ditanya',
     items: [
-      { q: 'Beneran gratis, gak ada biaya tersembunyi?', a: 'Iya, paket Gratis beneran gratis selamanya. Kalau butuh lebih (misal domain .com sendiri), baru upgrade ke Pro.' },
+      { q: 'Ada biaya tersembunyi gak?', a: 'Gak ada. Harganya udah termasuk hosting dan domain .com, gak ada tagihan kejutan di belakang.' },
       { q: 'Perlu bisa ngoding gak?', a: 'Gak sama sekali. Tinggal isi form info bisnis kamu, AI yang bikinin websitenya. Tinggal edit dikit kalau perlu.' },
       { q: 'Berapa lama website-nya jadi?', a: 'Hitungan menit, bukan minggu. Isi form, generate, langsung bisa di-publish.' },
       { q: 'Domain gratisnya beneran punya sendiri?', a: 'Iya, bukan subdomain. Kamu bisa pasang domain .com sendiri (misal namabisnismu.com) buat paket Pro.' }
@@ -1188,10 +1180,10 @@ const DEFAULT_LANDING_CONTENT = {
   finalCta: {
     headline: 'Tunggu Apa Lagi? Bisnismu Layak Online Hari Ini',
     subheadline: 'Ribuan UMKM udah mulai duluan. Giliran kamu sekarang.',
-    ctaText: 'Mulai Gratis Sekarang',
+    ctaText: 'Mulai Sekarang',
     ctaLink: 'https://wa.me/6285641806684?text=Halo%2C%20saya%20mau%20daftar%20bikin%20website%20di%20klikweb.id'
   },
-  footerText: '© klikweb.id — Website UMKM Gampang, Cepat, Gratis.'
+  footerText: '© klikweb.id — Website UMKM Gampang, Cepat, Terpercaya.'
 };
 
 app.get('/api/landing-content', async (req, res) => {

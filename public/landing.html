@@ -93,8 +93,8 @@
   .feature-card p{font-size:13.5px;color:var(--muted);margin-top:8px;}
 
   /* ---------- Pricing ---------- */
-  .pricing-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;max-width:700px;margin:0 auto;}
-  @media (max-width:640px){ .pricing-grid{grid-template-columns:1fr;} }
+  .pricing-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:22px;max-width:700px;margin:0 auto;}
+  .pricing-grid .price-card{flex:1 1 300px;max-width:340px;}
   .price-card{background:var(--panel);border:1.5px solid var(--line);border-radius:16px;padding:30px 26px;}
   .price-card.highlight{border-color:var(--accent);box-shadow:0 20px 40px -16px rgba(255,107,53,.3);position:relative;}
   .price-card.highlight::before{content:"PALING LARIS";position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:10.5px;font-weight:800;padding:5px 12px;border-radius:20px;letter-spacing:.03em;}
@@ -137,8 +137,7 @@
       <a href="#faq">FAQ</a>
     </nav>
     <div class="nav-actions">
-      <a href="/login.html" class="btn btn-outline">Masuk</a>
-      <a href="https://wa.me/6285641806684?text=Halo%2C%20saya%20mau%20daftar%20bikin%20website%20di%20klikweb.id" class="btn btn-ghost" target="_blank">Daftar Gratis</a>
+      <a href="https://wa.me/6285641806684?text=Halo%2C%20saya%20mau%20daftar%20bikin%20website%20di%20klikweb.id" class="btn btn-ghost" target="_blank">Chat Sekarang</a>
     </div>
   </div>
 </header>
