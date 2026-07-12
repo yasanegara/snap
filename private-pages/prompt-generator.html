@@ -271,7 +271,7 @@
       </select>
     </div>
 
-    <div class="field">
+    <div class="field" style="display:none;">
       <label>Login Admin Website</label>
       <div style="display:flex;gap:10px;">
         <div style="flex:1;">
@@ -355,6 +355,15 @@
 </script>
 
 <script>
+// ---------- Login admin website: auto-isi default, gak perlu diisi manual di form ----------
+// Username default "admin", password di-generate acak (bukan "admin123" yang gampang ditebak).
+// Nanti pemilik situs bisa gampang ganti sendiri lewat Panel Admin.
+(function(){
+  const randomPassword = Math.random().toString(36).slice(-8);
+  document.getElementById('adminUsername').value = 'admin';
+  document.getElementById('adminPassword').value = randomPassword;
+})();
+
 // ---------- Section yang bisa di-setup detailnya kalau aktif ----------
 // listConfig: kalau section punya ini, dia dapat form daftar item (bukan cuma teks bebas)
 const listConfigs = {
