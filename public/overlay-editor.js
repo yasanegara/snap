@@ -295,7 +295,11 @@
     var cancelBtn = document.createElement('button');
     cancelBtn.textContent = 'Batal';
     cancelBtn.style.cssText = 'padding:7px 12px;border:1px solid #ccc;background:#fff;border-radius:7px;font-size:12px;cursor:pointer;';
-    cancelBtn.onclick = function(){ pop.remove(); };
+    var activeAbortController = null;
+    cancelBtn.onclick = function(){
+      if (activeAbortController) { activeAbortController.abort(); }
+      pop.remove();
+    };
 
     var sendBtn = document.createElement('button');
     sendBtn.textContent = 'Kirim ke AI';
@@ -303,25 +307,28 @@
     sendBtn.onclick = function(){
       var instruction = textarea.value.trim();
       if (!instruction) { alert('Isi dulu instruksinya.'); return; }
-      sendBtn.disabled = true; cancelBtn.disabled = true;
+      sendBtn.disabled = true;
       sendBtn.textContent = '⏳ AI mikir...';
       statusDiv.style.display = 'block';
       statusDiv.style.color = '#666';
-      statusDiv.textContent = 'Menunggu AI...';
+      statusDiv.textContent = 'Menunggu AI... (bisa diklik "Batal" kalau kelamaan)';
 
       var currentSiteData = window.__getSiteData();
       var currentSectionData = currentSiteData.sections[sectionName];
       var streamEndpoint = window.__aiEditEndpoint.replace('/api/edit-section', '/api/edit-section-stream');
+      activeAbortController = new AbortController();
 
       function finishWithError(msg){
         statusDiv.style.color = '#c00';
         statusDiv.textContent = msg;
-        sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
+        sendBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
+        activeAbortController = null;
       }
 
       fetch(streamEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: activeAbortController.signal,
         body: JSON.stringify({
           currentData: { section: currentSectionData, design: currentSiteData.design || {} },
           instruction: instruction
@@ -379,11 +386,13 @@
 
             readChunk();
           }).catch(function(e){
+            if (e.name === 'AbortError') return;
             finishWithError('Gagal: koneksi terputus. Coba lagi.');
           });
         }
         readChunk();
       }).catch(function(e){
+        if (e.name === 'AbortError') return;
         finishWithError('Gagal: ' + e.message);
       });
     };
@@ -473,7 +482,11 @@
     var cancelBtn = document.createElement('button');
     cancelBtn.textContent = 'Batal';
     cancelBtn.style.cssText = 'padding:7px 12px;border:1px solid #ccc;background:#fff;border-radius:7px;font-size:12px;cursor:pointer;';
-    cancelBtn.onclick = function(){ pop.remove(); };
+    var activeAbortController = null;
+    cancelBtn.onclick = function(){
+      if (activeAbortController) { activeAbortController.abort(); }
+      pop.remove();
+    };
 
     var sendBtn = document.createElement('button');
     sendBtn.textContent = 'Kirim ke AI';
@@ -481,24 +494,27 @@
     sendBtn.onclick = function(){
       var instruction = textarea.value.trim();
       if (!instruction) { alert('Isi dulu instruksinya.'); return; }
-      sendBtn.disabled = true; cancelBtn.disabled = true;
+      sendBtn.disabled = true;
       sendBtn.textContent = '⏳ AI mikir...';
       statusDiv.style.display = 'block';
       statusDiv.style.color = '#666';
-      statusDiv.textContent = 'Menunggu AI...';
+      statusDiv.textContent = 'Menunggu AI... (bisa diklik "Batal" kalau kelamaan)';
 
       var currentSiteData = window.__getSiteData();
       var streamEndpoint = window.__aiEditEndpoint.replace('/api/edit-section', '/api/edit-page-stream');
+      activeAbortController = new AbortController();
 
       function finishWithError(msg){
         statusDiv.style.color = '#c00';
         statusDiv.textContent = msg;
-        sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
+        sendBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
+        activeAbortController = null;
       }
 
       fetch(streamEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: activeAbortController.signal,
         body: JSON.stringify({ currentData: currentSiteData, instruction: instruction })
       }).then(function(res){
         if (res.status === 402) {
@@ -542,12 +558,14 @@
             });
 
             readChunk();
-          }).catch(function(){
+          }).catch(function(e){
+            if (e.name === 'AbortError') return;
             finishWithError('Gagal: koneksi terputus. Coba lagi.');
           });
         }
         readChunk();
       }).catch(function(e){
+        if (e.name === 'AbortError') return;
         finishWithError('Gagal: ' + e.message);
       });
     };
