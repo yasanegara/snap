@@ -18,7 +18,12 @@
     if (!window.__dataEndpoint || document.getElementById('__platform-admin-btn')) return;
     var btn = document.createElement('a');
     btn.id = '__platform-admin-btn';
-    btn.href = '/admin.html?endpoint=' + encodeURIComponent(window.__dataEndpoint);
+    // Di halaman live/publish, pakai link pendek klikweb.id/slug/admin.
+    // Di preview (belum ada slug publish), fallback ke bentuk lama.
+    var slugMatch = window.__dataEndpoint.match(/\/api\/public-data\/([^/?]+)/);
+    btn.href = slugMatch
+      ? '/' + slugMatch[1] + '/admin'
+      : '/admin.html?endpoint=' + encodeURIComponent(window.__dataEndpoint);
     btn.textContent = '⚙️';
     btn.title = 'Panel Admin Website';
     btn.style.cssText = 'position:fixed;bottom:16px;left:16px;z-index:999996;background:#1a1d23;color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:16px;box-shadow:0 2px 10px rgba(0,0,0,.3);opacity:.55;transition:opacity .15s;';

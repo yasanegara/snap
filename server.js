@@ -1262,6 +1262,11 @@ app.post('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req,
   res.json({ ok: true });
 });
 
+// Link admin yang lebih pendek: klikweb.id/nama-slug/admin (dulu harus /admin.html?endpoint=...)
+app.get('/:slug/admin', (req, res) => {
+  res.redirect('/admin.html?endpoint=' + encodeURIComponent('/api/public-data/' + req.params.slug));
+});
+
 // Halaman publik hasil publish — DIPASANG PALING TERAKHIR dengan sengaja.
 // Formatnya klikweb.id/nama-slug (bukan /p/nama-slug lagi). Karena ini "menangkap"
 // SATU kata di path mana pun, dia WAJIB jadi route paling akhir, biar semua
