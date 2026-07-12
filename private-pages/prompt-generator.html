@@ -301,6 +301,12 @@
         <button class="btn" id="backToFormBtn">← Ubah Detail Lagi</button>
         <p class="hint" style="margin:0;">💡 Arahkan mouse ke tiap section di preview, klik "✨ Edit dengan AI" buat ubah bagian itu.</p>
       </div>
+
+      <div id="adminLoginInfoBox" style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;flex-wrap:wrap;">
+        <span>🔑 Login Panel Admin situs ini — Username: <b id="infoAdminUsername">admin</b> · Password: <b id="infoAdminPassword">-</b></span>
+        <button class="btn small" id="copyLoginInfoBtn">📋 Copy Info Login</button>
+      </div>
+
       <iframe id="aiPreviewFrame" style="width:100%;height:calc(100vh - 260px);min-height:500px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:16px;"></iframe>
 
       <div class="field">
@@ -944,6 +950,8 @@ async function runGenerate(){
       document.getElementById('mainLayout').classList.add('full-preview');
       document.getElementById('promptOutput').style.display = 'none';
       document.getElementById('aiResultPane').style.display = 'block';
+      document.getElementById('infoAdminUsername').textContent = document.getElementById('adminUsername').value || 'admin';
+      document.getElementById('infoAdminPassword').textContent = document.getElementById('adminPassword').value || '-';
       document.getElementById('aiPreviewFrame').srcdoc = format === 'react'
         ? buildReactDoc(currentGeneratedCode, { dataEndpointBase: '/api/data/', dataKey: hashCode(currentGeneratedCode.trim()) })
         : wrapPreviewWithErrorOverlay(currentGeneratedCode);
@@ -1038,6 +1046,20 @@ document.getElementById('backToFormBtn').addEventListener('click', () => {
   document.getElementById('mainLayout').classList.remove('full-preview');
   document.getElementById('aiResultPane').style.display = 'none';
   document.getElementById('promptOutput').style.display = 'block';
+});
+
+document.getElementById('copyLoginInfoBtn').addEventListener('click', () => {
+  const username = document.getElementById('infoAdminUsername').textContent;
+  const password = document.getElementById('infoAdminPassword').textContent;
+  const text = 'Login Panel Admin Website:\nUsername: ' + username + '\nPassword: ' + password;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyLoginInfoBtn');
+    const original = btn.textContent;
+    btn.textContent = 'Kesalin ✓';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  }).catch(() => {
+    prompt('Copy info ini:', text);
+  });
 });
 
 // ---------- Edit Section pakai AI ----------
