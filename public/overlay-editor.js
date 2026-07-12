@@ -9,34 +9,8 @@
 // window.__aiEditEndpoint ke-set).
 // ============================================================================
 
-// ---------- Tombol "⚙️ Admin" mengambang: SELALU muncul (preview MAUPUN halaman live/publish) ----------
-// Ini beda dari Mode Edit / Edit AI di bawah (yang cuma jalan di preview) — tombol ini
-// nyambungin ke panel admin terpusat platform (/admin.html), dipakai pemilik website
-// buat toggle section & ganti password sendiri, tanpa akses ke fitur AI.
-(function(){
-  function injectAdminButton(){
-    if (!window.__dataEndpoint || document.getElementById('__platform-admin-btn')) return;
-    var btn = document.createElement('a');
-    btn.id = '__platform-admin-btn';
-    // Di halaman live/publish, pakai link pendek klikweb.id/slug/admin.
-    // Di preview (belum ada slug publish), fallback ke bentuk lama.
-    var slugMatch = window.__dataEndpoint.match(/\/api\/public-data\/([^/?]+)/);
-    btn.href = slugMatch
-      ? '/' + slugMatch[1] + '/admin'
-      : '/admin.html?endpoint=' + encodeURIComponent(window.__dataEndpoint);
-    btn.textContent = '⚙️';
-    btn.title = 'Panel Admin Website';
-    btn.style.cssText = 'position:fixed;bottom:16px;left:16px;z-index:999996;background:#1a1d23;color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:16px;box-shadow:0 2px 10px rgba(0,0,0,.3);opacity:.55;transition:opacity .15s;';
-    btn.addEventListener('mouseenter', function(){ btn.style.opacity = '1'; });
-    btn.addEventListener('mouseleave', function(){ btn.style.opacity = '.55'; });
-    document.body.appendChild(btn);
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectAdminButton);
-  } else {
-    injectAdminButton();
-  }
-})();
+// Catatan: tombol "⚙️ Admin" mengambang yang dulu ada di sini udah DIHAPUS.
+// Sekarang akses panel admin cukup lewat link pendek: klikweb.id/nama-slug/admin
 
 (function(){
   if (!window.__ENABLE_EDIT_OVERLAY) return;

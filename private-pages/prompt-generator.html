@@ -131,6 +131,12 @@
     </div>
     <p class="hint" id="draftStatusHint" style="margin-top:-12px;margin-bottom:16px;"></p>
 
+    <div class="field" style="background:var(--panel-2);border:1px solid var(--accent);border-radius:10px;padding:14px;">
+      <label style="display:flex;align-items:center;gap:6px;">💬 Ketik Bebas Aja (opsional, lebih cepat)</label>
+      <textarea id="freeTextPrompt" placeholder="Contoh: Bikin website buat warung kopi saya namanya Kopi Senja, target anak muda, ada section hero, menu, lokasi, dan kontak WhatsApp. Gayanya santai tapi modern." style="width:100%;min-height:80px;margin-top:8px;"></textarea>
+      <p class="hint" style="margin-top:6px;">Kalau ini diisi, field-field detail di bawah bakal DILEWATIN — AI bakal generate langsung dari tulisan kamu di sini. Kosongkan kalau mau atur detail satu-satu di bawah.</p>
+    </div>
+
     <div class="field">
       <label>Format Output</label>
       <select id="outputFormatSelect">
@@ -564,6 +570,7 @@ function getActiveVals(containerId) {
 
 function buildPromptText(){
   const outputFormat = document.getElementById('outputFormatSelect').value;
+  const freeTextPrompt = document.getElementById('freeTextPrompt').value.trim();
   const bizName = document.getElementById('bizName').value.trim() || '(isi nama bisnis)';
   const bizType = document.getElementById('bizType').value.trim() || '(isi jenis bisnis)';
   const bizAudience = document.getElementById('bizAudience').value.trim() || '(isi target audiens)';
@@ -642,6 +649,10 @@ function buildPromptText(){
 '- CTA (tombol aksi) harus spesifik dan rendah risiko, bukan cuma "Klik Di Sini". Contoh: "Booking Sekarang, Gratis Konsultasi Dulu" lebih baik dari "Hubungi Kami".\n' +
 '- Fokus ke HASIL AKHIR yang didapat pelanggan (transformasi/manfaat), bukan cuma fitur/spesifikasi teknis.\n\n' +
 'Buatkan saya SATU FILE HTML lengkap (bukan React project terpisah) untuk website bisnis berikut:\n\n' +
+(freeTextPrompt ? (
+'💬 INSTRUKSI BEBAS DARI USER (INI PRIORITAS UTAMA, WAJIB DIIKUTI):\n"' + freeTextPrompt + '"\n\n' +
+'PENTING: ambil semua informasi bisnis (nama, jenis, target audiens, section yang perlu ada, gaya, dll) dari instruksi bebas di atas. Kalau field-field di bawah ini (NAMA BISNIS, JENIS BISNIS, dst) masih kosong/placeholder kayak "(isi nama bisnis)", ABAIKAN dan pakai keputusan kamu sendiri berdasarkan instruksi bebas di atas.\n\n'
+) : '') +
 'NAMA BISNIS: ' + bizName + '\n' +
 'JENIS BISNIS: ' + bizType + '\n' +
 'TARGET AUDIENS: ' + bizAudience + '\n' +
@@ -1125,6 +1136,7 @@ const DRAFT_KEY = 'promptGeneratorDraft_v1';
 function collectDraftData(){
   const activeSwatch = document.querySelector('#colorSwatches .active');
   return {
+    freeTextPrompt: document.getElementById('freeTextPrompt').value,
     bizName: document.getElementById('bizName').value,
     bizType: document.getElementById('bizType').value,
     bizAudience: document.getElementById('bizAudience').value,
@@ -1166,6 +1178,7 @@ document.getElementById('loadDraftBtn').addEventListener('click', () => {
   let d;
   try { d = JSON.parse(raw); } catch (e) { alert('Draft rusak, gak bisa dibaca.'); return; }
 
+  document.getElementById('freeTextPrompt').value = d.freeTextPrompt || '';
   document.getElementById('bizName').value = d.bizName || '';
   document.getElementById('bizType').value = d.bizType || '';
   document.getElementById('bizAudience').value = d.bizAudience || '';
