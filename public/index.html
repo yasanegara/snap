@@ -276,6 +276,7 @@
         <button class="btn" id="openTabBtn">Buka di tab baru</button>
         <button class="btn" id="resetDataBtn" title="Hapus semua data hasil edit di preview (kembali ke data awal kode)">Reset data</button>
         <button class="btn" id="editCodeAiBtn" style="background:#7C3AED;color:#fff;border-color:#7C3AED;font-weight:600;" title="Ubah STRUKTUR/CSS/tata letak kodenya pakai AI (bukan cuma data)">🛠️ Edit Kode dengan AI</button>
+        <button class="btn" id="undoEditCodeAiBtn" style="display:none;background:#ff6b6b;color:#fff;border-color:#ff6b6b;font-weight:600;" title="Balikin ke kode sebelum diedit AI barusan">↩️ Undo Edit AI</button>
         <button class="btn" id="publishAsNewBtn" style="display:none;font-size:11.5px;" title="Publish ke alamat/slug yang berbeda (bukan update yang lama)">Publish sbg baru</button>
         <button class="btn primary" id="publishBtn">🚀 Publish</button>
       </div>
@@ -437,6 +438,8 @@ document.getElementById('resetDataBtn').onclick = async () => {
 };
 
 // ---------- Edit Kode dengan AI (ubah struktur/CSS/layout, bukan cuma data) ----------
+let codeBeforeAiEdit = null;
+
 document.getElementById('editCodeAiBtn').onclick = () => {
   if (!codeInput.value.trim()) { alert('Belum ada kode buat diedit. Tempel/generate kode dulu.'); return; }
   document.getElementById('editCodeAiInstruction').value = '';
@@ -446,6 +449,15 @@ document.getElementById('editCodeAiBtn').onclick = () => {
 };
 document.getElementById('cancelEditCodeAiBtn').onclick = () => {
   document.getElementById('editCodeAiModal').classList.remove('show');
+};
+document.getElementById('undoEditCodeAiBtn').onclick = () => {
+  if (!codeBeforeAiEdit) return;
+  if (!confirm('Balikin kode ke sebelum diedit AI barusan? Perubahan dari AI bakal ilang.')) return;
+  codeInput.value = codeBeforeAiEdit;
+  codeBeforeAiEdit = null;
+  document.getElementById('undoEditCodeAiBtn').style.display = 'none';
+  statusBar.textContent = 'Kode dibalikin ke sebelum edit AI.';
+  runPreview();
 };
 document.getElementById('sendEditCodeAiBtn').onclick = () => {
   const instruction = document.getElementById('editCodeAiInstruction').value.trim();
@@ -459,6 +471,9 @@ document.getElementById('sendEditCodeAiBtn').onclick = () => {
   statusDiv.style.display = 'block';
   statusDiv.style.color = 'var(--muted)';
   statusDiv.textContent = 'Menunggu AI...';
+
+  // Simpan kode SEBELUM diedit, biar bisa di-undo kalau hasilnya rusak/gak sesuai
+  codeBeforeAiEdit = codeInput.value;
 
   function finishWithError(msg){
     statusDiv.style.color = '#ff6b6b';
@@ -504,7 +519,8 @@ document.getElementById('sendEditCodeAiBtn').onclick = () => {
             codeInput.value = evt.code;
             statusDiv.style.color = '#5eead4';
             statusDiv.textContent = 'Berhasil diupdate ✓ Preview di-refresh...';
-            runPreview();
+            document.getElementById('undoEditCodeAiBtn').style.display = 'inline-block';
+            try { runPreview(); } catch (e) { statusBar.textContent = 'Preview error: ' + e.message + ' — klik "↩️ Undo Edit AI" kalau mau balikin kode lama.'; }
             setTimeout(() => { document.getElementById('editCodeAiModal').classList.remove('show'); }, 1200);
           } else if (evt.type === 'error') {
             finishWithError('Gagal: ' + evt.error);
