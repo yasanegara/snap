@@ -1160,8 +1160,8 @@ const DEFAULT_LANDING_CONTENT = {
     plans: [
       {
         name: 'Pro',
-        price: 'Rp 16.700',
-        period: '/hari (setara Rp 500rb/bulan)',
+        price: 'Rp 3.300',
+        period: '/hari (setara Rp 1.200.000/tahun)',
         highlight: true,
         features: ['Website tanpa batas', 'Hosting gratis', 'Domain .com GRATIS', 'AI generate otomatis', 'Support prioritas'],
         ctaText: 'Mulai Sekarang'
