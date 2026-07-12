@@ -578,20 +578,29 @@ function buildPromptText(){
   const restrictions = document.getElementById('restrictions').value.trim();
   const referenceUrl = document.getElementById('referenceUrl').value.trim();
   const sections = sectionDefs.filter(s => s.active);
+
+  // Pilihan acak (dipakai kalau user milih "AI yang pilih") — DIACAK DI SINI, bukan diserahin
+  // ke AI. Soalnya kalau instruksinya sama persis tiap generate, AI cenderung balik ke pilihan
+  // yang sama lagi (bukan asal-acak beneran kayak yang diharapkan orang).
+  const styleOptions = ['Glassmorphism', 'Neumorphism', 'Neobrutalism', 'Bento Grid', 'Dark Mode Elegan', 'Modern Minimalis'];
+  const layoutOptions = ['Vertikal Klasik', 'Split Zig-Zag', 'Sidebar Navigasi', 'Majalah/Editorial', 'Layar Penuh per Section'];
+  const colorOptions = ['gold/amber (#D97706)', 'biru (#2563EB)', 'merah (#DC2626)', 'hijau emerald (#059669)', 'pink (#DB2777)', 'ungu (#7C3AED)', 'hitam/monokrom (#111827)'];
+  const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
   const styleRaw = document.getElementById('styleSelect').value;
   const style = styleRaw === '__AI_CHOOSE__'
-    ? 'BEBAS — kamu (AI) yang pilih sendiri gaya visual yang paling cocok buat jenis bisnis dan target audiens di atas (boleh pilih dari: Glassmorphism, Neumorphism, Neobrutalism, Bento Grid, Dark Mode Elegan, atau Modern Minimalis), jelaskan singkat alasan kamu pilih gaya itu sebelum kasih kode'
+    ? pickRandom(styleOptions) + ' (dipilihkan otomatis buat kamu — terapkan sesuai konteks jenis bisnis & target audiens di atas)'
     : styleRaw;
 
   const layoutRaw = document.getElementById('layoutSelect').value;
   const layout = layoutRaw === '__AI_CHOOSE__'
-    ? 'BEBAS — kamu (AI) yang pilih sendiri layout yang paling cocok buat jenis bisnis dan gaya visual di atas (boleh pilih dari: Vertikal Klasik, Split Zig-Zag, Sidebar Navigasi, Majalah/Editorial, atau Layar Penuh per Section), jelaskan singkat alasan kamu pilih layout itu sebelum kasih kode'
+    ? pickRandom(layoutOptions) + ' (dipilihkan otomatis buat kamu — terapkan sesuai konteks gaya visual di atas)'
     : layoutRaw;
 
   const activeColor = document.querySelector('#colorSwatches .active');
   let color;
   if (activeColor && activeColor.dataset.ai === '1') {
-    color = 'BEBAS — kamu (AI) yang pilih sendiri warna aksen yang paling cocok buat jenis bisnis dan gaya visual di atas';
+    color = pickRandom(colorOptions) + ' (dipilihkan otomatis buat kamu)';
   } else if (activeColor) {
     color = activeColor.dataset.val;
   } else if (isValidHex(document.getElementById('customColorHex').value)) {
