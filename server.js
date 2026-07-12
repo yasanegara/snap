@@ -973,6 +973,74 @@ app.post('/api/edit-page-stream', requireAuth, async (req, res) => {
   }
 });
 
+// Edit KODE-nya langsung pakai AI (bukan cuma data) — buat perubahan yang nyentuh
+// STRUKTUR/CSS/tata letak, yang gak bisa dikerjain lewat edit data biasa (misal
+// "jangan pakai gaya dashboard", "ganti jadi 2 kolom", dll).
+app.post('/api/edit-code-stream', requireAuth, async (req, res) => {
+  const { code, type, instruction } = req.body || {};
+  if (!code || !code.trim()) return res.status(400).json({ error: 'Kode kosong' });
+  if (!instruction || !instruction.trim()) return res.status(400).json({ error: 'Isi dulu instruksi perubahannya' });
+
+  const org = await getOrg(req.user.orgId);
+  if (!isOrgPro(org) && Number(org.token_balance) <= 0) {
+    return res.status(402).json({
+      error: 'Token AI kamu sudah habis. Minta tambahan token ke admin platform, atau upgrade ke Pro buat token tanpa batas.',
+      upgradeRequired: true
+    });
+  }
+
+  const isReactFormat = type === 'react';
+  const editPrompt =
+    'Ini kode website yang lagi dipakai sekarang (format: ' + (isReactFormat ? 'komponen React doang, TANPA DOCTYPE/head/body' : 'HTML lengkap satu file') + '):\n\n' +
+    '```\n' + code + '\n```\n\n' +
+    'Tolong ubah kode di atas sesuai instruksi berikut: "' + instruction.trim() + '"\n\n' +
+    'ATURAN WAJIB (PENTING BANGET, JANGAN DILANGGAR):\n' +
+    '- Balikin KODE LENGKAP hasil yang udah diupdate, dari awal sampai akhir — BUKAN potongan, BUKAN penjelasan, BUKAN markdown/```jsx pembungkus apa pun. Jawaban kamu HARUS langsung berupa kode mentah.\n' +
+    (isReactFormat
+      ? '- JANGAN tulis <!DOCTYPE>, <html>, <head>, <body>, atau tag <script> pembungkus apa pun — cuma komponennya aja, persis kayak format aslinya.\n'
+      : '- Tetap balikin SATU FILE HTML LENGKAP (<!DOCTYPE html> sampai </html>), jangan dipotong jadi cuma sebagian.\n') +
+    '- JANGAN hapus atau ubah struktur `defaultSiteData` (semua field-nya), `sectionOrder`, atau bagian hooks (useState/useEffect buat load-save data ke server) — itu WAJIB tetap ada PERSIS SAMA, biar platform tetap bisa nyimpen data pengunjung.\n' +
+    '- JANGAN hapus atribut `data-edit`/`data-edit-type` dari elemen yang udah ada.\n' +
+    '- JANGAN hapus field `seo` (title/description/image) di defaultSiteData.\n' +
+    '- Fokus CUMA ubah bagian yang diminta di instruksi. Bagian lain yang gak disebut/gak relevan, biarkan SAMA PERSIS seperti semula (jangan random ubah-ubah konten/copywriting yang gak diminta).';
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  const send = (obj) => res.write('data: ' + JSON.stringify(obj) + '\n\n');
+
+  try {
+    const { text: rawText, usage } = await generateHtmlFromPromptStream(editPrompt, (charCount) => {
+      send({ type: 'progress', charCount });
+    });
+    const newCode = stripStrayFences(extractCode(rawText));
+
+    if (!newCode || newCode.length < 20) {
+      send({ type: 'error', error: 'AI mengembalikan hasil yang kosong/gak lengkap. Coba instruksi yang lebih spesifik, atau coba lagi.' });
+      return res.end();
+    }
+
+    const tokensUsed = usage.inputTokens + usage.outputTokens;
+    await pool.query(
+      `UPDATE orgs SET
+        ai_input_tokens_used = ai_input_tokens_used + $2,
+        ai_output_tokens_used = ai_output_tokens_used + $3,
+        token_balance = GREATEST(token_balance - $4, 0)
+       WHERE id = $1`,
+      [req.user.orgId, usage.inputTokens, usage.outputTokens, tokensUsed]
+    );
+
+    send({ type: 'done', code: newCode });
+    res.end();
+  } catch (e) {
+    send({ type: 'error', error: e.message });
+    res.end();
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Billing (Midtrans)
 // ---------------------------------------------------------------------------

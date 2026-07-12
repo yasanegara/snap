@@ -275,6 +275,7 @@
         <div class="spacer"></div>
         <button class="btn" id="openTabBtn">Buka di tab baru</button>
         <button class="btn" id="resetDataBtn" title="Hapus semua data hasil edit di preview (kembali ke data awal kode)">Reset data</button>
+        <button class="btn" id="editCodeAiBtn" style="background:#7C3AED;color:#fff;border-color:#7C3AED;font-weight:600;" title="Ubah STRUKTUR/CSS/tata letak kodenya pakai AI (bukan cuma data)">🛠️ Edit Kode dengan AI</button>
         <button class="btn" id="publishAsNewBtn" style="display:none;font-size:11.5px;" title="Publish ke alamat/slug yang berbeda (bukan update yang lama)">Publish sbg baru</button>
         <button class="btn primary" id="publishBtn">🚀 Publish</button>
       </div>
@@ -371,6 +372,20 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="editCodeAiModal">
+  <div class="modal" style="width:420px;">
+    <h3>🛠️ Edit Kode dengan AI</h3>
+    <p style="font-size:12px;color:var(--muted);margin:-6px 0 14px;line-height:1.5;">Buat perubahan yang nyentuh STRUKTUR/CSS/tata letak (yang gak bisa dikerjain lewat Edit Section/Edit Seluruh Halaman biasa), misal: "jangan pakai gaya dashboard", "ganti jadi layout 2 kolom", "hapus sidebar".</p>
+    <textarea id="editCodeAiInstruction" placeholder="Contoh: ganti tata letaknya jadi lebih santai, jangan kayak dashboard admin" style="width:100%;min-height:80px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:9px 11px;border-radius:8px;font-size:13px;margin-bottom:10px;font-family:inherit;box-sizing:border-box;"></textarea>
+    <p style="font-size:11px;color:var(--muted);margin:0 0 14px;">⚠️ Ini ngubah kode-nya langsung (lebih "berat" dari edit data biasa), token yang kepake juga lebih banyak. Preview otomatis kereset dulu ke kode baru pas selesai.</p>
+    <div id="editCodeAiStatus" style="display:none;font-size:12.5px;margin-bottom:12px;"></div>
+    <div class="row">
+      <button class="btn" id="cancelEditCodeAiBtn">Batal</button>
+      <button class="btn primary" id="sendEditCodeAiBtn" style="background:#7C3AED;border-color:#7C3AED;">Kirim ke AI</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let currentType = 'react';
 const codeInput = document.getElementById('codeInput');
@@ -419,6 +434,88 @@ document.getElementById('resetDataBtn').onclick = async () => {
   } catch (e) { /* server mungkin belum jalan */ }
   statusBar.textContent = 'Data preview direset. Klik Run untuk memuat ulang.';
   runPreview();
+};
+
+// ---------- Edit Kode dengan AI (ubah struktur/CSS/layout, bukan cuma data) ----------
+document.getElementById('editCodeAiBtn').onclick = () => {
+  if (!codeInput.value.trim()) { alert('Belum ada kode buat diedit. Tempel/generate kode dulu.'); return; }
+  document.getElementById('editCodeAiInstruction').value = '';
+  document.getElementById('editCodeAiStatus').style.display = 'none';
+  document.getElementById('editCodeAiModal').classList.add('show');
+  document.getElementById('editCodeAiInstruction').focus();
+};
+document.getElementById('cancelEditCodeAiBtn').onclick = () => {
+  document.getElementById('editCodeAiModal').classList.remove('show');
+};
+document.getElementById('sendEditCodeAiBtn').onclick = () => {
+  const instruction = document.getElementById('editCodeAiInstruction').value.trim();
+  if (!instruction) { alert('Isi dulu instruksinya.'); return; }
+
+  const sendBtn = document.getElementById('sendEditCodeAiBtn');
+  const cancelBtn = document.getElementById('cancelEditCodeAiBtn');
+  const statusDiv = document.getElementById('editCodeAiStatus');
+  sendBtn.disabled = true; cancelBtn.disabled = true;
+  sendBtn.textContent = '⏳ AI mikir...';
+  statusDiv.style.display = 'block';
+  statusDiv.style.color = 'var(--muted)';
+  statusDiv.textContent = 'Menunggu AI...';
+
+  function finishWithError(msg){
+    statusDiv.style.color = '#ff6b6b';
+    statusDiv.textContent = msg;
+    sendBtn.disabled = false; cancelBtn.disabled = false; sendBtn.textContent = 'Kirim ke AI';
+  }
+
+  fetch('/api/edit-code-stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: codeInput.value, type: currentType, instruction })
+  }).then(res => {
+    if (res.status === 402) {
+      return res.json().then(data => finishWithError(data.error || 'Token AI habis.'));
+    }
+    if (!res.ok || !res.body) {
+      return res.text().then(rawText => {
+        let data; try { data = JSON.parse(rawText); } catch (e) { data = {}; }
+        finishWithError('Gagal: ' + (data.error || 'Server lagi ada gangguan sesaat. Coba lagi.'));
+      });
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    function readChunk(){
+      reader.read().then(({ done, value }) => {
+        if (done) return;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop();
+
+        parts.forEach(part => {
+          const line = part.trim();
+          if (line.indexOf('data:') !== 0) return;
+          let evt;
+          try { evt = JSON.parse(line.slice(5).trim()); } catch (e) { return; }
+
+          if (evt.type === 'progress') {
+            statusDiv.textContent = 'AI lagi nulis kode baru... (' + evt.charCount.toLocaleString('id-ID') + ' karakter)';
+          } else if (evt.type === 'done') {
+            codeInput.value = evt.code;
+            statusDiv.style.color = '#5eead4';
+            statusDiv.textContent = 'Berhasil diupdate ✓ Preview di-refresh...';
+            runPreview();
+            setTimeout(() => { document.getElementById('editCodeAiModal').classList.remove('show'); }, 1200);
+          } else if (evt.type === 'error') {
+            finishWithError('Gagal: ' + evt.error);
+          }
+        });
+
+        readChunk();
+      }).catch(() => finishWithError('Gagal: koneksi terputus. Coba lagi.'));
+    }
+    readChunk();
+  }).catch(e => finishWithError('Gagal: ' + e.message));
 };
 
 const workspaceSelect = document.getElementById('workspaceSelect');
