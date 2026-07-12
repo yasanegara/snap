@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const cookieParser = require('cookie-parser');
 
 const { pool, migrate } = require('./lib/db');
-const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny, requireSuperAdmin, requireSuperAdminPage } = require('./lib/auth');
+const { createSessionCookie, clearSessionCookie, requireAuth, requireAuthPage, attachUserIfAny, requireSuperAdmin, requireSuperAdminPage, requireStudioAccessPage } = require('./lib/auth');
 const { createProCheckout, CLIENT_KEY, PRO_PRICE } = require('./lib/midtrans');
 const { generateHtmlFromPrompt, generateHtmlFromPromptStream, extractCode, stripStrayFences, extractJSONObject, getSetting, setSetting, getAiConfig, estimateCostUSD, PRICING, ANTHROPIC_MODELS } = require('./lib/ai');
 
@@ -79,11 +79,11 @@ app.get('/', attachUserIfAny, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'landing.html'));
 });
 
-app.get('/app', requireAuthPage, (req, res) => {
+app.get('/app', requireAuthPage, requireStudioAccessPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/prompt-generator.html', requireAuthPage, (req, res) => {
+app.get('/prompt-generator.html', requireAuthPage, requireStudioAccessPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'private-pages', 'prompt-generator.html'));
 });
 
@@ -1131,7 +1131,7 @@ const DEFAULT_LANDING_CONTENT = {
     headline: 'Website UMKM Kamu Bisa ONLINE Hari Ini Juga',
     subheadline: 'Gak perlu ngoding, gak perlu nunggu berminggu-minggu, gak perlu keluar duit buat hosting & domain. Tinggal pilih desain, isi info bisnis kamu, langsung jadi website profesional yang siap dipakai jualan.',
     ctaText: 'Mulai Gratis Sekarang',
-    ctaLink: '/register.html',
+    ctaLink: 'https://wa.me/6285641806684?text=Halo%2C%20saya%20mau%20daftar%20bikin%20website%20di%20klikweb.id',
     ctaNote: 'Gratis coba, gak perlu kartu kredit'
   },
   painPoints: {
@@ -1168,8 +1168,8 @@ const DEFAULT_LANDING_CONTENT = {
       },
       {
         name: 'Pro',
-        price: 'Hubungi Kami',
-        period: '',
+        price: 'Rp 16.700',
+        period: '/hari (setara Rp 500rb/bulan)',
         highlight: true,
         features: ['Website tanpa batas', 'Hosting gratis', 'Domain .com GRATIS', 'AI generate otomatis', 'Support prioritas'],
         ctaText: 'Upgrade ke Pro'
@@ -1189,7 +1189,7 @@ const DEFAULT_LANDING_CONTENT = {
     headline: 'Tunggu Apa Lagi? Bisnismu Layak Online Hari Ini',
     subheadline: 'Ribuan UMKM udah mulai duluan. Giliran kamu sekarang.',
     ctaText: 'Mulai Gratis Sekarang',
-    ctaLink: '/register.html'
+    ctaLink: 'https://wa.me/6285641806684?text=Halo%2C%20saya%20mau%20daftar%20bikin%20website%20di%20klikweb.id'
   },
   footerText: '© klikweb.id — Website UMKM Gampang, Cepat, Gratis.'
 };
