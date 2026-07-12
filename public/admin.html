@@ -40,6 +40,12 @@
   .section-row{
     display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);
   }
+  .sibling-row{
+    display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);
+  }
+  .sibling-row:last-child{border-bottom:none;}
+  .sibling-row .name{font-size:13.5px;font-weight:500;}
+  .sibling-row .current-tag{font-size:10.5px;color:var(--accent);font-weight:700;margin-left:6px;}
   .section-row:last-child{border-bottom:none;}
   .section-row .name{font-size:13.5px;font-weight:500;text-transform:capitalize;}
   .toggle-switch{position:relative;width:38px;height:22px;flex-shrink:0;}
@@ -89,6 +95,12 @@
   </header>
 
   <div class="wrap">
+    <div class="panel-section" id="siblingPagesBox" style="display:none;">
+      <h2 id="siblingPagesTitle">Halaman Lain di Workspace Ini</h2>
+      <p class="hint" style="margin-bottom:12px;">Klik buat lihat halamannya. Tiap halaman punya username/password admin sendiri-sendiri, jadi kalau mau kelola halaman lain, login ulang di panel admin halaman itu.</p>
+      <div id="siblingPagesList"></div>
+    </div>
+
     <div class="panel-section">
       <h2>Tampilkan / Sembunyikan Section</h2>
       <div id="sectionToggleList"></div>
@@ -237,6 +249,39 @@ function showAdminView(){
   document.getElementById('adminView').style.display = 'block';
   renderSectionToggles();
   renderSectionEditors();
+  loadSiblingPages();
+}
+
+async function loadSiblingPages(){
+  // Slug halaman ini diambil dari endpoint (formatnya /api/public-data/<slug>)
+  const match = endpoint && endpoint.match(/\/api\/public-data\/([^/?]+)/);
+  if (!match) return; // preview (bukan halaman live), gak ada konsep "workspace siblings" di sini
+  const currentSlug = match[1];
+
+  try {
+    const res = await fetch('/api/workspace-siblings/' + encodeURIComponent(currentSlug));
+    if (!res.ok) return;
+    const data = await res.json();
+    const box = document.getElementById('siblingPagesBox');
+
+    if (!data.pages || data.pages.length <= 1) return; // cuma ada 1 halaman (halaman ini doang), gak usah ditampilin
+
+    document.getElementById('siblingPagesTitle').textContent = data.workspaceName
+      ? 'Halaman Lain di "' + data.workspaceName + '"'
+      : 'Halaman Lain di Workspace Ini';
+
+    document.getElementById('siblingPagesList').innerHTML = data.pages.map(p => {
+      const url = p.customDomain ? ('https://' + p.customDomain) : ('/' + p.slug);
+      return `
+        <div class="sibling-row">
+          <span class="name">${escapeHtml(p.name)}${p.isCurrent ? '<span class="current-tag">● HALAMAN INI</span>' : ''}</span>
+          <a href="${url}" target="_blank" class="btn" style="padding:6px 12px;font-size:11.5px;">Buka ↗</a>
+        </div>
+      `;
+    }).join('');
+
+    box.style.display = 'block';
+  } catch (e) { /* biarin, gak fatal */ }
 }
 
 document.getElementById('backToSiteLink').addEventListener('click', (e) => {

@@ -1183,6 +1183,32 @@ const DEFAULT_LANDING_CONTENT = {
   footerText: '© klikweb.id — Website UMKM Gampang, Cepat, Terpercaya.'
 };
 
+// Cari halaman lain yang satu workspace sama slug ini — dipakai di Panel Admin biar
+// pemilik website bisa lompat lihat/kelola halaman lain miliknya, gak cuma yang ini doang.
+app.get('/api/workspace-siblings/:slug', async (req, res) => {
+  const current = await pool.query('SELECT workspace_id FROM publishes WHERE slug = $1', [req.params.slug]);
+  if (!current.rows[0] || !current.rows[0].workspace_id) return res.json({ workspaceName: null, pages: [] });
+
+  const workspaceId = current.rows[0].workspace_id;
+  const wsRes = await pool.query('SELECT name FROM workspaces WHERE id = $1', [workspaceId]);
+  const pagesRes = await pool.query(
+    `SELECT p.slug, p.custom_domain AS "customDomain", p.updated_at AS "updatedAt",
+      (SELECT s.name FROM snippets s WHERE s.last_published_slug = p.slug LIMIT 1) AS name
+     FROM publishes p WHERE p.workspace_id = $1 ORDER BY p.updated_at DESC`,
+    [workspaceId]
+  );
+
+  res.json({
+    workspaceName: wsRes.rows[0] ? wsRes.rows[0].name : null,
+    pages: pagesRes.rows.map(p => ({
+      slug: p.slug,
+      name: p.name || p.slug,
+      customDomain: p.customDomain,
+      isCurrent: p.slug === req.params.slug
+    }))
+  });
+});
+
 app.get('/api/landing-content', async (req, res) => {
   const saved = await getSetting('landing_content', null);
   res.json(saved ? JSON.parse(saved) : DEFAULT_LANDING_CONTENT);
