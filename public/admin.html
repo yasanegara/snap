@@ -41,6 +41,26 @@
     display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);
   }
   .section-row:last-child{border-bottom:none;}
+  .product-card{
+    display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);align-items:flex-start;
+  }
+  .product-card:last-child{border-bottom:none;}
+  .product-photo-wrap{flex-shrink:0;position:relative;width:70px;height:70px;}
+  .product-photo{width:70px;height:70px;border-radius:8px;object-fit:cover;background:var(--panel-2);border:1px solid var(--line);}
+  .product-photo-btn{
+    position:absolute;bottom:-6px;left:0;right:0;text-align:center;background:var(--accent);color:var(--accent-text);
+    font-size:9px;font-weight:700;padding:2px 0;border-radius:5px;cursor:pointer;
+  }
+  .product-fields{flex:1;display:flex;flex-direction:column;gap:7px;}
+  .product-fields input, .product-fields textarea{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    padding:7px 9px;border-radius:6px;font-size:12.5px;box-sizing:border-box;
+  }
+  .product-row-2{display:flex;gap:7px;}
+  .product-row-2 input{flex:1;}
+  .product-actions{display:flex;gap:6px;margin-top:2px;}
+  .product-actions .btn{padding:5px 10px;font-size:11px;}
+  .product-actions .btn.danger{color:var(--danger);border-color:var(--danger);}
   .section-row .name{font-size:13.5px;font-weight:500;text-transform:capitalize;}
   .toggle-switch{position:relative;width:38px;height:22px;flex-shrink:0;}
   .toggle-switch input{opacity:0;width:0;height:0;}
@@ -89,6 +109,13 @@
   </header>
 
   <div class="wrap">
+    <div class="panel-section" id="productManagerBox" style="display:none;">
+      <h2>🛍️ Kelola Produk</h2>
+      <p class="hint" style="margin-bottom:14px;">Tambah, ubah, atau hapus produk di sini. Ganti foto langsung upload dari HP/komputer.</p>
+      <div id="productList"></div>
+      <button class="btn primary" id="addProductBtn" style="width:100%;margin-top:12px;">+ Tambah Produk Baru</button>
+    </div>
+
     <div class="panel-section">
       <h2>Tampilkan / Sembunyikan Section</h2>
       <div id="sectionToggleList"></div>
@@ -235,9 +262,108 @@ function escapeHtml(s){
 function showAdminView(){
   document.getElementById('loginView').style.display = 'none';
   document.getElementById('adminView').style.display = 'block';
+  renderProductManager();
   renderSectionToggles();
   renderSectionEditors();
 }
+
+function renderProductManager(){
+  const box = document.getElementById('productManagerBox');
+  if (!Array.isArray(siteData.products)) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+
+  const list = document.getElementById('productList');
+  if (siteData.products.length === 0) {
+    list.innerHTML = '<p class="hint">Belum ada produk. Klik "+ Tambah Produk Baru" di bawah.</p>';
+  } else {
+    list.innerHTML = siteData.products.map((p, i) => `
+      <div class="product-card" data-index="${i}">
+        <div class="product-photo-wrap">
+          <img class="product-photo" src="${p.image || ''}" onerror="this.style.background='var(--panel-2)';this.src='';" />
+          <label class="product-photo-btn">
+            Ganti Foto
+            <input type="file" accept="image/*" class="product-photo-input" style="display:none;" />
+          </label>
+        </div>
+        <div class="product-fields">
+          <input type="text" class="product-name" placeholder="Nama produk" value="${escapeHtml(p.name || '')}" />
+          <div class="product-row-2">
+            <input type="number" class="product-price" placeholder="Harga" value="${p.price != null ? p.price : ''}" />
+            <input type="number" class="product-stock" placeholder="Stok" value="${p.stock != null ? p.stock : ''}" />
+          </div>
+          <textarea class="product-desc" placeholder="Deskripsi singkat (opsional)" style="min-height:44px;">${escapeHtml(p.description || '')}</textarea>
+          <div class="product-actions">
+            <button class="btn primary product-save-btn" style="flex:1;">Simpan</button>
+            <button class="btn danger product-delete-btn">Hapus</button>
+          </div>
+          <div class="status-msg product-status"></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  list.querySelectorAll('.product-card').forEach(card => {
+    const i = parseInt(card.dataset.index, 10);
+    const statusEl = card.querySelector('.product-status');
+
+    card.querySelector('.product-photo-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { alert('Ukuran foto maksimal 5MB ya.'); return; }
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        siteData.products[i].image = reader.result;
+        card.querySelector('.product-photo').src = reader.result;
+        try {
+          await saveSiteData(siteData);
+          statusEl.style.display = 'block'; statusEl.style.color = '#5eead4'; statusEl.textContent = 'Foto tersimpan ✓';
+        } catch (err) {
+          statusEl.style.display = 'block'; statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Gagal simpan foto: ' + err.message;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    card.querySelector('.product-save-btn').addEventListener('click', async () => {
+      const name = card.querySelector('.product-name').value.trim();
+      const price = parseFloat(card.querySelector('.product-price').value) || 0;
+      const stock = parseInt(card.querySelector('.product-stock').value, 10) || 0;
+      const description = card.querySelector('.product-desc').value.trim();
+      if (!name) { alert('Nama produk gak boleh kosong.'); return; }
+
+      siteData.products[i] = { ...siteData.products[i], name, price, stock, description };
+      try {
+        await saveSiteData(siteData);
+        statusEl.style.display = 'block'; statusEl.style.color = '#5eead4'; statusEl.textContent = 'Tersimpan ✓';
+        setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+      } catch (err) {
+        statusEl.style.display = 'block'; statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Gagal: ' + err.message;
+      }
+    });
+
+    card.querySelector('.product-delete-btn').addEventListener('click', async () => {
+      if (!confirm('Yakin mau hapus produk "' + (siteData.products[i].name || 'ini') + '"?')) return;
+      siteData.products.splice(i, 1);
+      try {
+        await saveSiteData(siteData);
+        renderProductManager();
+      } catch (err) {
+        alert('Gagal hapus produk: ' + err.message);
+      }
+    });
+  });
+}
+
+document.getElementById('addProductBtn').addEventListener('click', async () => {
+  if (!Array.isArray(siteData.products)) siteData.products = [];
+  siteData.products.push({ id: 'produk-' + Date.now(), name: '', price: 0, stock: 0, image: '', description: '' });
+  try {
+    await saveSiteData(siteData);
+    renderProductManager();
+  } catch (e) {
+    alert('Gagal tambah produk: ' + e.message);
+  }
+});
 
 document.getElementById('backToSiteLink').addEventListener('click', (e) => {
   e.preventDefault();

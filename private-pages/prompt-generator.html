@@ -138,6 +138,15 @@
     </div>
 
     <div class="field">
+      <label>Jenis Website</label>
+      <select id="siteTypeSelect">
+        <option value="umum">Landing Page / Company Profile (Umum)</option>
+        <option value="toko">Toko Online (Ada Daftar Produk)</option>
+      </select>
+      <p class="hint" style="margin-top:6px;">Pilih "Toko Online" kalau butuh manajemen produk (nama, harga, stok, foto) yang bisa diubah-ubah sendiri lewat Panel Admin nanti.</p>
+    </div>
+
+    <div class="field">
       <label>Format Output</label>
       <select id="outputFormatSelect">
         <option value="html">HTML Lengkap (langsung bisa publish sendiri)</option>
@@ -570,6 +579,7 @@ function getActiveVals(containerId) {
 
 function buildPromptText(){
   const outputFormat = document.getElementById('outputFormatSelect').value;
+  const siteType = document.getElementById('siteTypeSelect').value;
   const freeTextPrompt = document.getElementById('freeTextPrompt').value.trim();
   const bizName = document.getElementById('bizName').value.trim() || '(isi nama bisnis)';
   const bizType = document.getElementById('bizType').value.trim() || '(isi jenis bisnis)';
@@ -706,11 +716,24 @@ function buildPromptText(){
 '{\n' +
 '  seo: { title: "Nama Bisnis - Jenis Layanan (SEO-friendly)", description: "Kalimat menarik maksimal 160 karakter", image: "https://url-foto-asli.com/foto.jpg" },\n' +
 '  design: { ctaColor: "...", ctaHoverColor: "...", ctaTextColor: "..." },\n' +
+(siteType === 'toko' ? '  siteType: "toko",\n' : '') +
 '  sectionOrder: ["hero", "about", ...],\n' +
-'  sections: { hero: { visible: true, title: "...", image: "...", ... }, about: {...}, ... }\n' +
+'  sections: { hero: { visible: true, title: "...", image: "...", ... }, about: {...}, ... }' + (siteType === 'toko' ? ',\n' : '\n') +
+(siteType === 'toko' ?
+'  products: [\n' +
+'    { id: "produk-1", name: "Nama Produk", price: 50000, stock: 10, image: "https://url-foto-produk.com/x.jpg", description: "Deskripsi singkat produk" },\n' +
+'    ... (isi minimal 4-6 produk contoh yang masuk akal buat jenis bisnis ini)\n' +
+'  ]\n'
+: '') +
 '}\n' +
 'PENTING soal `seo.image`: HARUS berupa URL foto yang BENERAN VALID dan bisa diakses publik (misal dari unsplash.com atau placehold.co), JANGAN PERNAH base64 — base64 gak bisa dibaca WhatsApp/Facebook buat bikin thumbnail pas link dibagikan. Boleh sama dengan foto hero, atau foto lain yang representatif.\n' +
 'Setiap section punya field `visible` (boolean) buat sembunyikan/tampilkan.\n\n' +
+(siteType === 'toko' ?
+'2a. WAJIB: TAMPILKAN DAFTAR PRODUK\n' +
+'Buat 1 section (misal id/key "produk") yang nampilin SEMUA produk dari `defaultSiteData.products` pakai `.map()` — bentuknya kartu produk (grid), tiap kartu isinya: foto, nama, harga (format "Rp 50.000"), badge stok (misal "Stok: 10"), dan tombol "Pesan via WhatsApp" yang linknya include nama produk itu di pesannya (contoh: `https://wa.me/62812xxxx?text=Halo%2C%20saya%20mau%20pesan%20` + nama produk).\n' +
+'`price` dan `stock` itu ANGKA (number), BUKAN string, biar gampang diolah nanti.\n' +
+'JANGAN taruh data-edit di dalam .map() produk (biarin tanpa data-edit) — soalnya produk-produk ini dikelola lewat panel admin khusus produk, bukan lewat klik-edit biasa.\n\n'
+: '') +
 '2b. TANDA ELEMEN YANG BISA DIEDIT LANGSUNG (WAJIB)\n' +
 'Setiap elemen JSX yang menampilkan isi dari `siteData` (judul, teks, gambar, dll) WAJIB dikasih atribut `data-edit` berisi path menuju datanya, dan `data-edit-type` sesuai jenisnya ("text" buat judul singkat, "textarea" buat paragraf panjang, "image" buat gambar). Contoh:\n' +
 '```jsx\n' +
@@ -1145,6 +1168,7 @@ const DRAFT_KEY = 'promptGeneratorDraft_v1';
 function collectDraftData(){
   const activeSwatch = document.querySelector('#colorSwatches .active');
   return {
+    siteType: document.getElementById('siteTypeSelect').value,
     freeTextPrompt: document.getElementById('freeTextPrompt').value,
     bizName: document.getElementById('bizName').value,
     bizType: document.getElementById('bizType').value,
@@ -1187,6 +1211,7 @@ document.getElementById('loadDraftBtn').addEventListener('click', () => {
   let d;
   try { d = JSON.parse(raw); } catch (e) { alert('Draft rusak, gak bisa dibaca.'); return; }
 
+  document.getElementById('siteTypeSelect').value = d.siteType || 'umum';
   document.getElementById('freeTextPrompt').value = d.freeTextPrompt || '';
   document.getElementById('bizName').value = d.bizName || '';
   document.getElementById('bizType').value = d.bizType || '';
