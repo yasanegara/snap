@@ -1312,9 +1312,9 @@ app.post('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req,
   if (sumopodModel) await setSetting('ai_model_sumopod', sumopodModel);
   if (sumopodApiKey) await setSetting('ai_api_key_sumopod', sumopodApiKey);
   if (sumopodMaxTokens) await setSetting('ai_max_tokens_sumopod', String(parseInt(sumopodMaxTokens, 10)));
-  if (customBaseUrl !== undefined) await setSetting('ai_base_url_custom', customBaseUrl);
-  if (customModel) await setSetting('ai_model_custom', customModel);
-  if (customApiKey) await setSetting('ai_api_key_custom', customApiKey);
+  if (customBaseUrl !== undefined) await setSetting('ai_base_url_custom', customBaseUrl.trim());
+  if (customModel) await setSetting('ai_model_custom', customModel.trim());
+  if (customApiKey) await setSetting('ai_api_key_custom', customApiKey.trim());
   if (customMaxTokens) await setSetting('ai_max_tokens_custom', String(parseInt(customMaxTokens, 10)));
   res.json({ ok: true });
 });
