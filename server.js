@@ -1273,6 +1273,7 @@ app.get('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, 
 
   const anthropicKeySrc = (await getSetting('ai_api_key_anthropic', null)) ? 'database' : (process.env.ANTHROPIC_API_KEY ? 'env' : 'belum-diset');
   const sumopodKeySrc = (await getSetting('ai_api_key_sumopod', null)) ? 'database' : (process.env.SUMOPOD_API_KEY ? 'env' : 'belum-diset');
+  const customKeySrc = (await getSetting('ai_api_key_custom', null)) ? 'database' : 'belum-diset';
 
   res.json({
     provider,
@@ -1288,12 +1289,22 @@ app.get('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, 
       model: (await getSetting('ai_model_sumopod', null)) || process.env.SUMOPOD_MODEL || 'claude-sonnet-4-6',
       maxTokens: parseInt((await getSetting('ai_max_tokens_sumopod', null)) || '120000', 10),
       keySource: sumopodKeySrc
+    },
+    custom: {
+      baseUrl: (await getSetting('ai_base_url_custom', null)) || '',
+      model: (await getSetting('ai_model_custom', null)) || '',
+      maxTokens: parseInt((await getSetting('ai_max_tokens_custom', null)) || '32000', 10),
+      keySource: customKeySrc
     }
   });
 });
 
 app.post('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {
-  const { provider, anthropicModel, anthropicApiKey, anthropicMaxTokens, sumopodModel, sumopodApiKey, sumopodMaxTokens } = req.body || {};
+  const {
+    provider, anthropicModel, anthropicApiKey, anthropicMaxTokens,
+    sumopodModel, sumopodApiKey, sumopodMaxTokens,
+    customBaseUrl, customModel, customApiKey, customMaxTokens
+  } = req.body || {};
   if (provider) await setSetting('ai_provider', provider);
   if (anthropicModel) await setSetting('ai_model_anthropic', anthropicModel);
   if (anthropicApiKey) await setSetting('ai_api_key_anthropic', anthropicApiKey);
@@ -1301,6 +1312,10 @@ app.post('/api/superadmin/settings', requireAuth, requireSuperAdmin, async (req,
   if (sumopodModel) await setSetting('ai_model_sumopod', sumopodModel);
   if (sumopodApiKey) await setSetting('ai_api_key_sumopod', sumopodApiKey);
   if (sumopodMaxTokens) await setSetting('ai_max_tokens_sumopod', String(parseInt(sumopodMaxTokens, 10)));
+  if (customBaseUrl !== undefined) await setSetting('ai_base_url_custom', customBaseUrl);
+  if (customModel) await setSetting('ai_model_custom', customModel);
+  if (customApiKey) await setSetting('ai_api_key_custom', customApiKey);
+  if (customMaxTokens) await setSetting('ai_max_tokens_custom', String(parseInt(customMaxTokens, 10)));
   res.json({ ok: true });
 });
 
