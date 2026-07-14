@@ -728,6 +728,7 @@ function buildPromptText(){
 '}\n' +
 'PENTING soal `seo.image`: HARUS berupa URL foto yang BENERAN VALID dan bisa diakses publik (misal dari unsplash.com atau placehold.co), JANGAN PERNAH base64 — base64 gak bisa dibaca WhatsApp/Facebook buat bikin thumbnail pas link dibagikan. Boleh sama dengan foto hero, atau foto lain yang representatif.\n' +
 'Setiap section punya field `visible` (boolean) buat sembunyikan/tampilkan.\n\n' +
+'⚠️ PALING PENTING BANGET (SERING DILANGGAR, WAJIB DIPATUHI): SELURUH jawaban kamu HARUS 100% berupa KODE MURNI dari awal sampai akhir. JANGAN PERNAH nyisipin kalimat penjelasan, alasan, atau catatan (kayak "saya perlu memastikan...", "penting untuk...", dll) DI TENGAH-TENGAH kode atau di dalam object `defaultSiteData` — walau cuma 1 kalimat doang. Kalimat penjelasan yang nyelip di tengah kode/data itu bikin KODE-NYA RUSAK TOTAL dan situsnya gagal tampil sama sekali. Kalau kamu punya catatan/alasan yang mau disampein, JANGAN ditulis sama sekali — cukup langsung tulis kode-nya aja tanpa komentar apa pun.\n\n' +
 (siteType === 'toko' ?
 '2a. WAJIB: TAMPILKAN DAFTAR PRODUK\n' +
 'Buat 1 section (misal id/key "produk") yang nampilin SEMUA produk dari `defaultSiteData.products` pakai `.map()` — bentuknya kartu produk (grid), tiap kartu isinya: foto, nama, harga (format "Rp 50.000"), badge stok (misal "Stok: 10"), dan tombol "Pesan via WhatsApp" yang linknya include nama produk itu di pesannya (contoh: `https://wa.me/62812xxxx?text=Halo%2C%20saya%20mau%20pesan%20` + nama produk).\n' +
