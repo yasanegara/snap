@@ -779,7 +779,13 @@ function buildPromptText(){
 '- Jangan tulis komentar penjelasan panjang di kode, jangan tulis kode yang gak kepake.\n' +
 '- Kalimat/teks konten (judul, deskripsi) boleh singkat dan padat, gak perlu paragraf panjang-panjang.\n' +
 '- JANGAN buat form admin manual (lihat poin sebelumnya).\n\n' +
-'Tolong langsung berikan kode HTML lengkapnya, tanpa penjelasan panjang di luar kode.';
+'ATURAN FORMAT JAWABAN (PALING PENTING, SERING DILANGGAR):\n' +
+'- Jawaban kamu HARUS LANGSUNG DIMULAI dengan kode (misal `<!DOCTYPE html>` atau `const App = () => {`), TANPA kalimat pembuka apa pun ("Baik, saya akan...", "Berikut kodenya...", dll).\n' +
+'- SEPANJANG kode itu, dari awal sampai akhir, HARUS 100% kode/JSON valid — JANGAN PERNAH menyelipkan kalimat penjelasan biasa (bahasa manusia) di TENGAH-TENGAH kode/objek data, walaupun cuma 1 kalimat pendek. Ini WAJIB dihindari — kalau kamu mau "mikir" dulu soal pendekatan/copywriting/struktur, lakukan itu SEBELUM mulai nulis kode, JANGAN dituangkan ke dalam kode itu sendiri.\n' +
+'- Objek `defaultSiteData` itu HARUS jadi bagian utuh dari KODE komponennya (bukan dikirim terpisah sebagai JSON doang) — pastikan setiap section yang disebut di `sectionOrder` BENERAN ada isinya lengkap di `sections`, jangan ada yang kelewatan/setengah jadi.\n' +
+'- Jangan berhenti nulis sebelum kode-nya beneran lengkap dan closing tag/kurung terakhir ketutup semua.\n' +
+'- Setelah kode selesai, JANGAN tambahkan penjelasan/catatan penutup apa pun juga.\n\n' +
+'Tolong langsung berikan kode HTML lengkapnya, tanpa penjelasan apa pun di luar ATAU di dalam kode.';
 }
 
 document.getElementById('generateBtn').addEventListener('click', () => {
