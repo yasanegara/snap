@@ -61,6 +61,7 @@
   .cta-note{font-size:12.5px;color:var(--muted);}
 
   /* Mockup browser */
+  .mockup-wrap{position:relative;padding-top:22px;}
   .mockup{background:var(--panel);border-radius:16px;box-shadow:0 30px 60px -20px rgba(15,61,62,.25);border:1px solid var(--line);overflow:hidden;position:relative;}
   .mockup-bar{background:var(--bg-alt);padding:10px 14px;display:flex;gap:6px;border-bottom:1px solid var(--line);}
   .mockup-dot{width:9px;height:9px;border-radius:50%;background:var(--line);}
@@ -70,7 +71,8 @@
   .mockup-btn{display:inline-block;margin-top:14px;background:var(--accent);color:#fff;padding:8px 16px;border-radius:7px;font-size:11.5px;font-weight:700;}
   .mockup-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:16px;background:var(--panel);}
   .mockup-card{background:var(--bg-alt);border-radius:8px;height:50px;}
-  .float-badge{position:absolute;top:-14px;right:18px;background:var(--gold);color:var(--primary-dark);font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:20px;box-shadow:0 6px 16px rgba(255,193,69,.5);}
+  .float-badge{position:absolute;top:0;right:18px;background:var(--gold);color:var(--primary-dark);font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:20px;box-shadow:0 6px 16px rgba(255,193,69,.5);z-index:2;white-space:nowrap;}
+  @media (max-width:480px){ .float-badge{right:50%;transform:translateX(50%);font-size:10.5px;padding:6px 10px;} }
 
   section{padding:64px 0;}
   .section-alt{background:var(--bg-alt);}
@@ -154,19 +156,21 @@
         <span class="cta-note" id="heroCtaNote">Gratis coba, gak perlu kartu kredit</span>
       </div>
     </div>
-    <div class="mockup">
+    <div class="mockup-wrap">
       <div class="float-badge">✨ Jadi dalam hitungan menit</div>
-      <div class="mockup-bar"><span class="mockup-dot"></span><span class="mockup-dot"></span><span class="mockup-dot"></span></div>
-      <div class="mockup-body">
-        <div class="mockup-title">Warung Kopi Senja</div>
-        <div class="mockup-sub">Kopi susu gula aren terenak di Sleman</div>
-        <div class="mockup-btn">Order via WhatsApp →</div>
-      </div>
-      <div class="mockup-cards">
-        <div class="mockup-card"></div>
-        <div class="mockup-card"></div>
-        <div class="mockup-card"></div>
-        <div class="mockup-card"></div>
+      <div class="mockup">
+        <div class="mockup-bar"><span class="mockup-dot"></span><span class="mockup-dot"></span><span class="mockup-dot"></span></div>
+        <div class="mockup-body">
+          <div class="mockup-title">Warung Kopi Senja</div>
+          <div class="mockup-sub">Kopi susu gula aren terenak di Sleman</div>
+          <div class="mockup-btn">Order via WhatsApp →</div>
+        </div>
+        <div class="mockup-cards">
+          <div class="mockup-card"></div>
+          <div class="mockup-card"></div>
+          <div class="mockup-card"></div>
+          <div class="mockup-card"></div>
+        </div>
       </div>
     </div>
   </div>
